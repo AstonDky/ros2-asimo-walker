@@ -1,6 +1,7 @@
 # CoppeliaSim Asti ROS 2 双足行走控制实验
 
-[Uploading Screencast from 2026-05-18 18-39-14.webm…]()
+[Screencast from 2026-05-18 18-39-14.webm](https://github.com/user-attachments/assets/81c9a704-1310-49cc-b34c-85f9a7de79d2)
+
 
 ## 项目意图
 
