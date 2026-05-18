@@ -1,0 +1,73 @@
+[0.004s] Invoking command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/astondky/Desktop/robot_simulation_experiment_ws/src/robot_simulation_experiment -DPython3_EXECUTABLE=/usr/bin/python3 -DCMAKE_INSTALL_PREFIX=/home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment
+[0.037s] -- The C compiler identification is GNU 13.3.0
+[0.068s] -- The CXX compiler identification is GNU 13.3.0
+[0.077s] -- Detecting C compiler ABI info
+[0.126s] -- Detecting C compiler ABI info - done
+[0.131s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.131s] -- Detecting C compile features
+[0.131s] -- Detecting C compile features - done
+[0.137s] -- Detecting CXX compiler ABI info
+[0.189s] -- Detecting CXX compiler ABI info - done
+[0.195s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.195s] -- Detecting CXX compile features
+[0.196s] -- Detecting CXX compile features - done
+[0.197s] -- Found ament_cmake: 2.5.6 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.275s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[0.330s] -- Found rclcpp: 28.1.18 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.352s] -- Found rosidl_generator_c: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.359s] -- Found rosidl_generator_cpp: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.368s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.377s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.411s] -- Found rmw_implementation_cmake: 7.3.3 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.413s] -- Found rmw_fastrtps_cpp: 8.4.3 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.450s] -- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.so (found version "3.0.13")  
+[0.460s] -- Found FastRTPS: /opt/ros/jazzy/include (Required is at least version "2.13") 
+[0.471s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.505s] -- Found std_msgs: 5.3.7 (/opt/ros/jazzy/share/std_msgs/cmake)
+[0.512s] -- Found geometry_msgs: 5.3.7 (/opt/ros/jazzy/share/geometry_msgs/cmake)
+[0.520s] -- Found sensor_msgs: 5.3.7 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[0.532s] -- Found ament_lint_auto: 0.17.5 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[0.588s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.588s] -- Configured 'flake8' exclude dirs and/or files: 
+[0.588s] -- Added test 'lint_cmake' to check CMake code style
+[0.588s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.589s] -- Added test 'xmllint' to check XML markup files
+[0.590s] -- Configuring done (0.6s)
+[0.592s] -- Generating done (0.0s)
+[0.593s] -- Build files have been written to: /home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment
+[0.600s] Invoked command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake /home/astondky/Desktop/robot_simulation_experiment_ws/src/robot_simulation_experiment -DPython3_EXECUTABLE=/usr/bin/python3 -DCMAKE_INSTALL_PREFIX=/home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment
+[0.600s] Invoking command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment -- -j24 -l24
+[0.626s] Invoked command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment -- -j24 -l24
+[0.632s] Invoking command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment
+[0.636s] -- Install configuration: ""
+[0.636s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/control_eye_in_hand_ros2.py
+[0.636s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/human_walking_stable_step_ros2.py
+[0.636s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/humanoid_walk_only_ros2.py
+[0.636s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_style_zmp_walker
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/zmp_preview.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/__pycache__
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/zmp_reference.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/swing_foot.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/leg_ik.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/stabilizer.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/common.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/contact_state_machine.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/footstep_planner.py
+[0.638s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/lib/robot_simulation_experiment/asimo_walker/__init__.py
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/ament_index/resource_index/package_run_dependencies/robot_simulation_experiment
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/ament_index/resource_index/parent_prefix_path/robot_simulation_experiment
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/environment/ament_prefix_path.sh
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/environment/ament_prefix_path.dsv
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/environment/path.sh
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/environment/path.dsv
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/local_setup.bash
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/local_setup.sh
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/local_setup.zsh
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/local_setup.dsv
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/package.dsv
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/ament_index/resource_index/packages/robot_simulation_experiment
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/cmake/robot_simulation_experimentConfig.cmake
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/cmake/robot_simulation_experimentConfig-version.cmake
+[0.639s] -- Installing: /home/astondky/Desktop/robot_simulation_experiment_ws/install/robot_simulation_experiment/share/robot_simulation_experiment/package.xml
+[0.640s] Invoked command in '/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment
