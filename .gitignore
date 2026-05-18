@@ -5,6 +5,7 @@ log/
 AGENTS.md
 instruc.md
 protected/
+src/robot_simulation_experiment/scripts/asimo_walker/autotune.py
 
 __pycache__/
 *.py[cod]
