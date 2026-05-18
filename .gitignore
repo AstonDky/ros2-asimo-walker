@@ -1,0 +1,15 @@
+build/
+install/
+log/
+
+AGENTS.md
+instruc.md
+protected/
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.coverage
+coverage/

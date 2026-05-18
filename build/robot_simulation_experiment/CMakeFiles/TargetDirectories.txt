@@ -1,9 +1,0 @@
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/uninstall.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/robot_simulation_experiment_uninstall.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/test.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/edit_cache.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/rebuild_cache.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/list_install_components.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/install.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/install/local.dir
-/home/astondky/Desktop/robot_simulation_experiment_ws/build/robot_simulation_experiment/CMakeFiles/install/strip.dir

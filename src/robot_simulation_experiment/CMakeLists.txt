@@ -25,13 +25,6 @@ if(BUILD_TESTING)
 endif()
 
 install(PROGRAMS
-  scripts/control_eye_in_hand_ros2.py
-  scripts/human_walking_stable_step_ros2.py
-  scripts/humanoid_walk_only_ros2.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(PROGRAMS
   scripts/asimo_walker/main.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME asimo_style_zmp_walker
@@ -40,10 +33,15 @@ install(PROGRAMS
 install(CODE "execute_process(COMMAND /usr/bin/sed -i \"1s|.*|#!/usr/bin/python3|\" \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/asimo_style_zmp_walker\")")
 
 install(DIRECTORY
-  scripts/asimo_walker/
-  DESTINATION lib/${PROJECT_NAME}/asimo_walker
+  scripts/
+  DESTINATION lib/${PROJECT_NAME}
+  FILE_PERMISSIONS
+    OWNER_READ OWNER_WRITE
+    GROUP_READ
+    WORLD_READ
   FILES_MATCHING PATTERN "*.py"
-  PATTERN "main.py" EXCLUDE
+  PATTERN "asimo_walker/main.py" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
 )
 
 ament_package()

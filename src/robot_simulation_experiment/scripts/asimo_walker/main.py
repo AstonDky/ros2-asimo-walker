@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 import math
 import os
 import sys
-from datetime import datetime
 
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +11,7 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from std_msgs.msg import Float64MultiArray
 
+from asimo_walker.autotune import AutoTuneManager
 from asimo_walker.common import D, LEG_DOF, Pose2D, RobotFeedback, WalkerParams, clamp, lerp, smoothstep
 from asimo_walker.contact_state_machine import ContactAndStateMachine, WalkState
 from asimo_walker.footstep_planner import FootstepPlanner
@@ -22,62 +22,18 @@ from asimo_walker.zmp_preview import ZMPPreviewPlanner
 from asimo_walker.zmp_reference import ZMPReferencePlanner
 
 
-WORKSPACE = "/home/astondky/Desktop/robot_simulation_experiment_ws"
-PACKAGE = "robot_simulation_experiment"
-EXECUTABLE = "asimo_style_zmp_walker"
-
-
-class TrialMetrics:
-    def __init__(self, profile_name: str, params: WalkerParams):
-        self.profile_name = profile_name
-        self.params = params
-        self.max_abs_pitch_deg = 0.0
-        self.max_abs_roll_deg = 0.0
-        self.max_abs_gyro = 0.0
-        self.forward_progress = 0.0
-        self.duration = 0.0
-        self.steps_completed = 0
-        self.abort = False
-        self.score = -999.0
-
-    def update(self, pitch: float, roll: float, gyro: list, progress: float, duration: float, steps: int, abort: bool) -> None:
-        self.max_abs_pitch_deg = max(self.max_abs_pitch_deg, abs(pitch) / D)
-        self.max_abs_roll_deg = max(self.max_abs_roll_deg, abs(roll) / D)
-        self.max_abs_gyro = max(self.max_abs_gyro, max(abs(v) for v in gyro[:2]) if gyro else 0.0)
-        self.forward_progress = max(self.forward_progress, progress)
-        self.duration = duration
-        self.steps_completed = max(self.steps_completed, steps)
-        self.abort = self.abort or abort
-        penalty = 50.0 if self.abort else 0.0
-        self.score = (
-            self.forward_progress * 10.0
-            + self.steps_completed * 2.0
-            - self.max_abs_pitch_deg * 0.2
-            - self.max_abs_roll_deg * 0.2
-            - penalty
-        )
-
-    def success(self) -> bool:
-        return (
-            not self.abort
-            and self.max_abs_pitch_deg < 12.0
-            and self.max_abs_roll_deg < 12.0
-            and self.forward_progress > 0.02
-            and self.steps_completed >= 1
-        )
-
-
 class AsimoStyleZMPWalker(Node):
     def __init__(self):
         super().__init__("asimo_style_zmp_walker")
         self.declare_parameter("mode", "walk")
         self.mode = str(self.get_parameter("mode").value)
 
+        # WalkerParams is created before any motion state so both walk and
+        # auto-tune modes start from the same defaults.
         self.params = WalkerParams()
         self.dt = self.params.dt
         self.feedback = RobotFeedback()
         self.ori0 = None
-        self.walk_start_forward = None
 
         self.leg_pub = self.create_publisher(Float64MultiArray, "/legTargetJoints", 10)
         self.arm_pub = self.create_publisher(Float64MultiArray, "/armTargetJoints", 10)
@@ -122,13 +78,7 @@ class AsimoStyleZMPWalker(Node):
         self.last_debug_t = self.get_clock().now()
         self.pending_step_adjustment = None
 
-        self.profile_index = 0
-        self.trial_started = False
-        self.trial_start_time = None
-        self.trial_metrics = None
-        self.all_metrics = []
-        self.auto_tune_profiles = self._build_profiles()
-        self.auto_tune_done = False
+        self.autotune = AutoTuneManager(self) if self.mode == "auto_tune" else None
 
         self.timer = self.create_timer(self.dt, self.loop)
         self.get_logger().info(f"mode={self.mode}; publishing /legTargetJoints and /armTargetJoints")
@@ -177,7 +127,6 @@ class AsimoStyleZMPWalker(Node):
 
         if self.ori0 is None:
             self.ori0 = list(self.feedback.ori[:3])
-            self.walk_start_forward = self._map_forward_position()
             self.initial_left_q = list(self.feedback.left_leg)
             self.initial_right_q = list(self.feedback.right_leg)
             self.prev_left_cmd = list(self.initial_left_q)
@@ -187,8 +136,8 @@ class AsimoStyleZMPWalker(Node):
             self.state_machine.start()
             self.get_logger().info("feedback ready; IMU zero initialized and crouch sequence started")
 
-        if self.mode == "auto_tune" and not self.trial_started:
-            self._start_profile(0)
+        if self.autotune is not None:
+            self.autotune.start_if_needed()
 
         pitch = self.feedback.ori[0] - self.ori0[0]
         roll = self.feedback.ori[1] - self.ori0[1]
@@ -202,7 +151,8 @@ class AsimoStyleZMPWalker(Node):
             self._publish_legs(left_q, right_q)
             self._publish_arms([], [])
             self._debug(state, pitch, roll, self._foot_center(), self._foot_center())
-            self._auto_tune_tick(pitch, roll, gyro, state)
+            if self.autotune is not None:
+                self.autotune.tick(pitch, roll, gyro, state)
             return
 
         current_step = self.footsteps.get_step(self.state_machine.step_index)
@@ -254,7 +204,8 @@ class AsimoStyleZMPWalker(Node):
         self._publish_legs(left_q, right_q)
         self._publish_arms(stab.left_arm_add, stab.right_arm_add)
         self._debug(state, pitch, roll, zmp_now, (com_x, com_y))
-        self._auto_tune_tick(pitch, roll, gyro, state)
+        if self.autotune is not None:
+            self.autotune.tick(pitch, roll, gyro, state)
 
     def _foot_targets(self, state: WalkState, step) -> tuple:
         left_target = self.left_pose.copy()
@@ -396,157 +347,6 @@ class AsimoStyleZMPWalker(Node):
             return math.sqrt(data[0] ** 2 + data[1] ** 2 + data[2] ** 2)
         return abs(float(data[0]))
 
-    def _build_profiles(self) -> list:
-        base = {}
-        return [
-            ("front_minus_y_high_lift", dict(base)),
-            ("front_minus_y_slower_hold", dict(base, step_time=1.95, double_support_time=0.65, foot_clearance=0.045)),
-            ("front_minus_y_longer_step", dict(base, step_length=0.055, step_time=1.95, double_support_time=0.65, foot_clearance=0.050)),
-            ("front_minus_y_medium_step", dict(base, step_length=0.045, step_time=1.75, double_support_time=0.55, foot_clearance=0.045)),
-            ("front_minus_y_extra_clearance", dict(base, step_length=0.045, step_time=1.95, double_support_time=0.65, foot_clearance=0.055)),
-            ("front_minus_y_low_pelvis", dict(base, step_length=0.045, pelvis_height=0.46, step_time=1.95, double_support_time=0.65)),
-            ("front_minus_y_more_damped", dict(base, step_length=0.045, zmp_kp=1.2, zmp_kd=1.2, step_time=1.95, double_support_time=0.65)),
-            ("front_minus_y_ankle_soft", dict(base, step_length=0.045, ankle_pitch_kp=0.25, ankle_roll_kp=0.25, step_time=1.95, double_support_time=0.65)),
-        ]
-
-    def _start_profile(self, index: int) -> None:
-        name, profile = self.auto_tune_profiles[index]
-        self.params = WalkerParams.from_profile(profile)
-        self.dt = self.params.dt
-        self.footsteps.reset(self.params)
-        self.zmp_ref.reset(self.params)
-        self.com.reset(self.params, 0.0, 0.0)
-        self.swing.reset(self.params)
-        self.ik.reset(self.params)
-        self.stabilizer.reset(self.params)
-        self.state_machine.reset(self.params)
-        self.state_machine.start()
-        self.left_pose = self.footsteps.initial_left()
-        self.right_pose = self.footsteps.initial_right()
-        self.swing_start = {"left": self.left_pose.copy(), "right": self.right_pose.copy()}
-        self.initial_left_q = list(self.feedback.left_leg)
-        self.initial_right_q = list(self.feedback.right_leg)
-        self.prev_left_cmd = list(self.feedback.left_leg)
-        self.prev_right_cmd = list(self.feedback.right_leg)
-        self.stand_start_left_cmd = None
-        self.stand_start_right_cmd = None
-        self.walk_start_forward = self._map_forward_position()
-        self.trial_start_time = self.get_clock().now()
-        self.trial_metrics = TrialMetrics(name, self.params)
-        self.trial_started = True
-        self.last_state = self.state_machine.state
-        self.get_logger().info(f"auto_tune profile {index + 1}/{len(self.auto_tune_profiles)}: {name}")
-
-    def _auto_tune_tick(self, pitch: float, roll: float, gyro: list, state: WalkState) -> None:
-        if self.mode != "auto_tune" or self.auto_tune_done or not self.trial_started:
-            return
-        elapsed = (self.get_clock().now() - self.trial_start_time).nanoseconds * 1e-9
-        progress = self._map_forward_position() - self.walk_start_forward
-        abort = state == WalkState.ABORT or abs(pitch) > self.params.abort_tilt or abs(roll) > self.params.abort_tilt
-        self.trial_metrics.update(pitch, roll, gyro, progress, elapsed, self.state_machine.step_index, abort)
-
-        if elapsed >= 10.0 or abort or state in (WalkState.DONE, WalkState.ABORT):
-            self.all_metrics.append(self.trial_metrics)
-            self.get_logger().info(
-                f"profile {self.trial_metrics.profile_name} done: score={self.trial_metrics.score:.2f} "
-                f"success={self.trial_metrics.success()} progress={self.trial_metrics.forward_progress:.3f} "
-                f"pitch={self.trial_metrics.max_abs_pitch_deg:.1f} roll={self.trial_metrics.max_abs_roll_deg:.1f} "
-                f"abort={self.trial_metrics.abort}"
-            )
-            if self.trial_metrics.success() or self.profile_index + 1 >= len(self.auto_tune_profiles):
-                self.auto_tune_done = True
-                self._write_tuning_log(topics_detected=True, trials_completed=True)
-                rclpy.shutdown()
-                return
-            self.profile_index += 1
-            self._start_profile(self.profile_index)
-
-    def _write_tuning_log(self, topics_detected: bool, trials_completed: bool, failure_reason: str = "") -> None:
-        best = max(self.all_metrics, key=lambda m: m.score) if self.all_metrics else None
-        success = best.success() if best else False
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        path = _instruc_path()
-        with open(path, "a", encoding="utf-8") as f:
-            f.write("\n## Asti ASIMO-style ZMP walker tuning log\n\n")
-            if success:
-                f.write(f"### Successful profile - {now}\n\n")
-            else:
-                f.write(f"### Auto tune attempt - {now}\n\n")
-            f.write(f"- workspace: `{WORKSPACE}`\n")
-            f.write(f"- package: `{PACKAGE}`\n")
-            f.write(f"- executable: `{EXECUTABLE}`\n")
-            f.write(f"- CoppeliaSim topics detected: `{topics_detected}`\n")
-            f.write(f"- build completed: `true`\n")
-            f.write(f"- trials completed: `{trials_completed}`\n")
-            if best:
-                f.write("\n| field | value |\n| --- | --- |\n")
-                for key in (
-                    "step_length",
-                    "step_width",
-                    "sagittal_sign",
-                    "support_zmp_margin",
-                    "foot_clearance",
-                    "pelvis_height",
-                    "step_time",
-                    "double_support_time",
-                    "swing_lift_fraction",
-                    "swing_lower_fraction",
-                    "zmp_kp",
-                    "zmp_kd",
-                    "ankle_pitch_kp",
-                    "ankle_roll_kp",
-                ):
-                    f.write(f"| {key} | {getattr(best.params, key)} |\n")
-                f.write("\n| metric | value |\n| --- | --- |\n")
-                f.write(f"| profile_name | {best.profile_name} |\n")
-                f.write(f"| max_abs_pitch_deg | {best.max_abs_pitch_deg:.3f} |\n")
-                f.write(f"| max_abs_roll_deg | {best.max_abs_roll_deg:.3f} |\n")
-                f.write(f"| max_abs_gyro | {best.max_abs_gyro:.3f} |\n")
-                f.write(f"| forward_progress | {best.forward_progress:.3f} |\n")
-                f.write(f"| duration | {best.duration:.3f} |\n")
-                f.write(f"| steps_completed | {best.steps_completed} |\n")
-                f.write(f"| abort | {best.abort} |\n")
-                f.write(f"| score | {best.score:.3f} |\n")
-            if success:
-                f.write("\n- run command: `ros2 run robot_simulation_experiment asimo_style_zmp_walker --ros-args -p mode:=auto_tune`\n")
-                f.write("- note: 参数是在 CoppeliaSim Asti 场景下自动试运行得到的。\n")
-            else:
-                reason = failure_reason or "No profile met success thresholds."
-                f.write(f"\n- failure reason: {reason}\n")
-                f.write("- next step: 启动 CoppeliaSim Asti 场景后复测；若已启动，先根据 pitch/roll 方向确认 ankle/hip 补偿符号。\n")
-
-    def _map_forward_position(self) -> float:
-        if not self.feedback.pos or len(self.feedback.pos) < 2:
-            return 0.0
-        return -float(self.feedback.pos[1])
-
-
-def _instruc_path() -> str:
-    preferred = os.path.join(WORKSPACE, "Instruc.md")
-    lower = os.path.join(WORKSPACE, "instruc.md")
-    if os.path.exists(preferred):
-        return preferred
-    if os.path.exists(lower):
-        return lower
-    return preferred
-
-
-def append_no_topic_log(build_completed: bool, topic_output: str = "") -> None:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    path = _instruc_path()
-    with open(path, "a", encoding="utf-8") as f:
-        f.write("\n## Asti ASIMO-style ZMP walker tuning log\n\n")
-        f.write(f"### Auto tune attempt - {now}\n\n")
-        f.write("- CoppeliaSim topics detected: `false`\n")
-        f.write(f"- build completed: `{str(build_completed).lower()}`\n")
-        f.write("- trials completed: `false`\n")
-        f.write("- best failed profile: `none`\n")
-        f.write("- failure reason: 未检测到 `/robot/ori`, `/robot/angVel`, `/robot/pos`, `/leftLegJoints`, `/rightLegJoints` 关键仿真话题，未进行自动调参。\n")
-        if topic_output:
-            f.write("- observed topics: `" + ", ".join(topic_output.split()) + "`\n")
-        f.write("- next step: 启动 CoppeliaSim Asti 场景和 ROS2 bridge 后运行 `ros2 run robot_simulation_experiment asimo_style_zmp_walker --ros-args -p mode:=auto_tune`。\n")
-
-
 def main(args=None):
     if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
         print("ASIMO-style ZMP walker for CoppeliaSim Asti")
@@ -560,6 +360,9 @@ def main(args=None):
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
+    except Exception as exc:
+        if exc.__class__.__name__ != "RCLError":
+            raise
     finally:
         if rclpy.ok():
             node.destroy_node()

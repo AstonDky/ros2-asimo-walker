@@ -100,9 +100,9 @@ class StabilizerOutput:
 class WalkerParams:
     step_length: float = 0.045
     step_width: float = 0.09
-    step_time: float = 1.75
-    double_support_time: float = 0.55
-    foot_clearance: float = 0.045
+    step_time: float = 1.62
+    double_support_time: float = 0.48
+    foot_clearance: float = 0.052
     pelvis_height: float = 0.48
     total_steps: int = 6
     sagittal_sign: float = -1.0
@@ -118,14 +118,14 @@ class WalkerParams:
     hip_roll_kp: float = 0.18
 
     crouch_time: float = 1.5
-    transfer_time: float = 0.85
+    transfer_time: float = 0.74
     touchdown_time: float = 0.25
     stand_time: float = 2.0
-    swing_lift_fraction: float = 0.28
-    swing_lower_fraction: float = 0.30
+    swing_lift_fraction: float = 0.24
+    swing_lower_fraction: float = 0.26
     dt: float = 0.02
 
-    max_joint_rate: float = 1.45
+    max_joint_rate: float = 1.55
     max_arm_rate: float = 1.2
     max_com_speed: float = 0.075
     max_com_accel: float = 0.20
