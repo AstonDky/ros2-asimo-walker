@@ -1,4 +1,16 @@
 
+## 重点关注与可整理分享内容
+
+这里记录项目内部最值得关注的调参、自动调参和阶段性验证结果。README 面向公开展示，重点写项目目标、工程结构和已经完成的工作；本文件用于保留更细的实验过程、参数对比、失败原因、自动调参结果和后续可整理成分享材料的内容。
+
+当前最有价值的分享线索：
+
+- 从直接关节序列转向 ASIMO-style 模块化控制栈：`FootstepPlanner -> ZMPReferencePlanner -> ZMPPreviewPlanner -> SwingFootPlanner -> LegIK -> Stabilizer -> ContactAndStateMachine -> joint limit/rate limit -> ROS2 publisher`。
+- 自动调参和人工验证结合：自动调参用于筛选保守参数，人工 `walk` 验证用于确认完整 6 步、最终 `STAND/DONE` 和姿态恢复。
+- 方向修正：CoppeliaSim 场景中期望前进方向为世界/地图负 Y，代码中用 `sagittal_sign = -1.0` 和 `forward_progress = -robot_pos_y - start_forward` 修正“看起来倒退”的问题。
+- 稳定性迭代：高抬脚和大步长提高前进距离，但第三步附近容易 roll ABORT；回退到 `step_length=0.045`、`foot_clearance=0.045`、`support_zmp_margin=0.004`、`max_com_speed=0.075`、`max_com_accel=0.20` 后完成 6 步并保持站立。
+- 最终站立恢复：最后一步后不再继续走 ZMP/IK 路径，而是用 `stand_time=2.0` 平滑插值回初始关节反馈姿态，解决“走完后继续倒”的问题。
+
 ## 参数记录与对比要求
 
 后续每次修改 ASIMO-style walker 参数后，都必须在本文件追加一条记录。记录不能只写新参数，还要写清楚“相比上一组参数具体提升了什么”。提升描述要尽量量化，例如：是否减少 ABORT、最大 pitch/roll 降低多少、完成步数从多少变成多少、前进距离增加多少、最终 `STAND/DONE` 是否更稳、是否减少脚拖地或落脚冲击。
