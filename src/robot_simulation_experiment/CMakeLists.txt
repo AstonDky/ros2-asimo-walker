@@ -26,6 +26,7 @@ endif()
 
 install(PROGRAMS
   scripts/asimo_walker/main.py
+  scripts/test.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME asimo_style_zmp_walker
 )
