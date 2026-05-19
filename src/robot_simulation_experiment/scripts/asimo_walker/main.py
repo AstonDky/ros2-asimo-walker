@@ -29,7 +29,6 @@ class AsimoStyleZMPWalker(Node):
         self.mode = str(self.get_parameter("mode").value)
 
         # WalkerParams is created before any motion state so both walk and
-        # auto-tune modes start from the same defaults.
         self.params = WalkerParams()
         self.dt = self.params.dt
         self.feedback = RobotFeedback()

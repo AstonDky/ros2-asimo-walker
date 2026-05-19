@@ -100,9 +100,9 @@ class StabilizerOutput:
 class WalkerParams:
     step_length: float = 0.045
     step_width: float = 0.09
-    step_time: float = 1.62
-    double_support_time: float = 0.48
-    foot_clearance: float = 0.052
+    step_time: float = 1.76
+    double_support_time: float = 0.60
+    foot_clearance: float = 0.050
     pelvis_height: float = 0.48
     total_steps: int = 6
     sagittal_sign: float = -1.0
@@ -110,7 +110,7 @@ class WalkerParams:
 
     zmp_preview_time: float = 0.8
     zmp_kp: float = 1.6
-    zmp_kd: float = 1.0
+    zmp_kd: float = 1.15
 
     ankle_pitch_kp: float = 0.35
     ankle_roll_kp: float = 0.35
@@ -118,17 +118,17 @@ class WalkerParams:
     hip_roll_kp: float = 0.18
 
     crouch_time: float = 1.5
-    transfer_time: float = 0.74
-    touchdown_time: float = 0.25
+    transfer_time: float = 0.88
+    touchdown_time: float = 0.34
     stand_time: float = 2.0
-    swing_lift_fraction: float = 0.24
-    swing_lower_fraction: float = 0.26
+    swing_lift_fraction: float = 0.30
+    swing_lower_fraction: float = 0.34
     dt: float = 0.02
 
-    max_joint_rate: float = 1.55
+    max_joint_rate: float = 1.38
     max_arm_rate: float = 1.2
-    max_com_speed: float = 0.075
-    max_com_accel: float = 0.20
+    max_com_speed: float = 0.066
+    max_com_accel: float = 0.16
 
     stable_pitch: float = 5.0 * D
     stable_roll: float = 6.0 * D
