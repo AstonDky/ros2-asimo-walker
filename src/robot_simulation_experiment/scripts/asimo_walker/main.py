@@ -2,6 +2,7 @@
 import math
 import os
 import sys
+import threading
 
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,21 +19,32 @@ from asimo_walker.footstep_planner import FootstepPlanner
 from asimo_walker.leg_ik import LegIK
 from asimo_walker.stabilizer import Stabilizer
 from asimo_walker.swing_foot import SwingFootPlanner
+from asimo_walker.teleop_command import TeleopCommandBuffer, TeleopInputState
+from asimo_walker.teleop_profiles import get_profile, requested_profile_name, resolve_profile_from_input
 from asimo_walker.zmp_preview import ZMPPreviewPlanner
 from asimo_walker.zmp_reference import ZMPReferencePlanner
 
 
 class AsimoStyleZMPWalker(Node):
-    def __init__(self):
+    def __init__(self, teleop_buffer=None):
         super().__init__("asimo_style_zmp_walker")
-        self.declare_parameter("mode", "walk")
+        self.declare_parameter("mode", "teleop_gui")
         self.mode = str(self.get_parameter("mode").value)
 
-        # WalkerParams is created before any motion state so both walk and
+        # WalkerParams is created before motion state so every mode starts from the same baseline.
         self.params = WalkerParams()
         self.dt = self.params.dt
         self.feedback = RobotFeedback()
         self.ori0 = None
+        self.teleop_buffer = teleop_buffer
+        self.active_profile = get_profile("idle")
+        self.pending_profile = get_profile("idle")
+        self.teleop_status_message = "Idle / safe hold."
+        self.teleop_requested_profile_name = "idle"
+        self.teleop_active_profile_name = "idle"
+        self.teleop_state_name = "WAIT"
+        self.teleop_pitch_deg = None
+        self.teleop_roll_deg = None
 
         self.leg_pub = self.create_publisher(Float64MultiArray, "/legTargetJoints", 10)
         self.arm_pub = self.create_publisher(Float64MultiArray, "/armTargetJoints", 10)
@@ -132,8 +144,11 @@ class AsimoStyleZMPWalker(Node):
             self.prev_right_cmd = list(self.initial_right_q)
             self._init_arms()
             self.com.reset(self.params, 0.0, 0.0)
-            self.state_machine.start()
-            self.get_logger().info("feedback ready; IMU zero initialized and crouch sequence started")
+            if self.mode == "teleop_gui":
+                self.get_logger().info("feedback ready; IMU zero initialized and teleop idle hold active")
+            else:
+                self.state_machine.start()
+                self.get_logger().info("feedback ready; IMU zero initialized and crouch sequence started")
 
         if self.autotune is not None:
             self.autotune.start_if_needed()
@@ -142,8 +157,13 @@ class AsimoStyleZMPWalker(Node):
         roll = self.feedback.ori[1] - self.ori0[1]
         gyro = list(self.feedback.gyro or [0.0, 0.0, 0.0])
 
+        if self.mode == "teleop_gui" and self._teleop_hold_before_update(pitch, roll):
+            return
+
         state = self.state_machine.update(self.dt, self.feedback, pitch, roll)
         self._handle_state_entry(state)
+        if self.mode == "teleop_gui":
+            self._update_teleop_runtime_status(state, pitch, roll)
 
         if state in (WalkState.STAND, WalkState.DONE):
             left_q, right_q = self._stand_recovery_targets(state)
@@ -156,6 +176,8 @@ class AsimoStyleZMPWalker(Node):
 
         current_step = self.footsteps.get_step(self.state_machine.step_index)
         next_step = None
+        if self.mode == "teleop_gui" and self.active_profile.allow_continuous_steps:
+            self.footsteps.ensure_steps(self.state_machine.step_index + 2)
         if self.state_machine.step_index + 1 < len(self.footsteps.steps):
             next_step = self.footsteps.get_step(self.state_machine.step_index + 1)
 
@@ -205,6 +227,126 @@ class AsimoStyleZMPWalker(Node):
         self._debug(state, pitch, roll, zmp_now, (com_x, com_y))
         if self.autotune is not None:
             self.autotune.tick(pitch, roll, gyro, state)
+
+    def _teleop_hold_before_update(self, pitch: float, roll: float) -> bool:
+        input_state = self.teleop_buffer.snapshot() if self.teleop_buffer else TeleopInputState()
+        profile, status = resolve_profile_from_input(input_state)
+        requested_name = requested_profile_name(input_state)
+        self.pending_profile = profile
+        self.teleop_requested_profile_name = requested_name
+        self.teleop_status_message = status
+
+        state = self.state_machine.state
+        if input_state.emergency_stop:
+            self.active_profile = get_profile("idle")
+            self.teleop_active_profile_name = self.active_profile.name
+            self._update_teleop_runtime_status(state, pitch, roll)
+            self._publish_hold_commands()
+            return True
+
+        if input_state.pause:
+            self.active_profile = get_profile("idle")
+            self.teleop_active_profile_name = self.active_profile.name
+            self._request_safe_stop_or_hold(state)
+            if state in (WalkState.WAIT, WalkState.STAND, WalkState.DONE, WalkState.ABORT):
+                self._update_teleop_runtime_status(state, pitch, roll)
+                self._publish_hold_commands()
+                return True
+            return False
+
+        if profile.name == "forward_walk" and profile.enabled:
+            self.active_profile = profile
+            self.teleop_active_profile_name = profile.name
+            self.state_machine.clear_stop_request()
+            if state in (WalkState.WAIT, WalkState.DONE):
+                self._reset_teleop_walk_session()
+                self.state_machine.start()
+            elif state == WalkState.STAND:
+                self._reset_teleop_walk_session()
+                self.state_machine.start()
+            elif state == WalkState.ABORT:
+                self.active_profile = get_profile("idle")
+                self.teleop_active_profile_name = self.active_profile.name
+                self.teleop_status_message = "Walker is ABORT; holding current command."
+                self._update_teleop_runtime_status(state, pitch, roll)
+                self._publish_hold_commands()
+                return True
+            return False
+
+        self.active_profile = get_profile("idle")
+        self.teleop_active_profile_name = self.active_profile.name
+        self._request_safe_stop_or_hold(state)
+        if state in (WalkState.WAIT, WalkState.STAND, WalkState.DONE, WalkState.ABORT):
+            self._update_teleop_runtime_status(state, pitch, roll)
+            self._publish_hold_commands()
+            return True
+        return False
+
+    def _request_safe_stop_or_hold(self, state: WalkState) -> None:
+        if state in (WalkState.CROUCH, WalkState.TRANSFER_TO_LEFT, WalkState.TRANSFER_TO_RIGHT):
+            self._enter_stand_recovery()
+        elif state in (
+            WalkState.LEFT_SWING,
+            WalkState.LEFT_TOUCHDOWN,
+            WalkState.DOUBLE_SUPPORT_AFTER_LEFT,
+            WalkState.RIGHT_SWING,
+            WalkState.RIGHT_TOUCHDOWN,
+            WalkState.DOUBLE_SUPPORT_AFTER_RIGHT,
+        ):
+            self.state_machine.request_stop_after_current_step()
+
+    def _enter_stand_recovery(self) -> None:
+        self.state_machine.clear_stop_request()
+        self.state_machine._set(WalkState.STAND)
+        self.stand_start_left_cmd = list(self.prev_left_cmd or self.feedback.left_leg)
+        self.stand_start_right_cmd = list(self.prev_right_cmd or self.feedback.right_leg)
+
+    def _reset_teleop_walk_session(self) -> None:
+        self.params = WalkerParams()
+        self.dt = self.params.dt
+        self.footsteps.reset(self.params)
+        self.zmp_ref.reset(self.params)
+        self.com.reset(self.params, 0.0, 0.0)
+        self.swing.reset(self.params)
+        self.ik.reset(self.params)
+        self.stabilizer.reset(self.params)
+        self.state_machine.reset(self.params)
+        self.state_machine.set_continuous_walk(self.active_profile.allow_continuous_steps)
+        self.left_pose = self.footsteps.initial_left()
+        self.right_pose = self.footsteps.initial_right()
+        self.swing_start = {"left": self.left_pose.copy(), "right": self.right_pose.copy()}
+        self.initial_left_q = list(self.feedback.left_leg)
+        self.initial_right_q = list(self.feedback.right_leg)
+        self.prev_left_cmd = list(self.feedback.left_leg)
+        self.prev_right_cmd = list(self.feedback.right_leg)
+        self.stand_start_left_cmd = None
+        self.stand_start_right_cmd = None
+        self.pending_step_adjustment = None
+        self.last_state = self.state_machine.state
+
+    def _publish_hold_commands(self) -> None:
+        left_q = list(self.prev_left_cmd or self.feedback.left_leg or [0.0] * LEG_DOF)
+        right_q = list(self.prev_right_cmd or self.feedback.right_leg or [0.0] * LEG_DOF)
+        self.prev_left_cmd = left_q
+        self.prev_right_cmd = right_q
+        self._publish_legs(left_q, right_q)
+
+    def _update_teleop_runtime_status(self, state: WalkState, pitch: float, roll: float) -> None:
+        self.teleop_state_name = state.name
+        self.teleop_pitch_deg = pitch / D
+        self.teleop_roll_deg = roll / D
+
+    def teleop_status_snapshot(self) -> dict:
+        pitch = "-" if self.teleop_pitch_deg is None else f"{self.teleop_pitch_deg:.2f} deg"
+        roll = "-" if self.teleop_roll_deg is None else f"{self.teleop_roll_deg:.2f} deg"
+        return {
+            "requested_profile": self.teleop_requested_profile_name,
+            "active_profile": self.teleop_active_profile_name,
+            "status_message": self.teleop_status_message,
+            "state": self.teleop_state_name,
+            "pitch": pitch,
+            "roll": roll,
+        }
 
     def _foot_targets(self, state: WalkState, step) -> tuple:
         left_target = self.left_pose.copy()
@@ -350,22 +492,68 @@ def main(args=None):
     if any(arg in ("-h", "--help") for arg in sys.argv[1:]):
         print("ASIMO-style ZMP walker for CoppeliaSim Asti")
         print("Usage:")
-        print("  ros2 run robot_simulation_experiment asimo_style_zmp_walker")
-        print("  ros2 run robot_simulation_experiment asimo_style_zmp_walker --ros-args -p mode:=auto_tune")
+        print("  ros2 run robot_simulation_experiment main.py")
+        print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=walk")
+        print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=auto_tune")
+        print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui")
         return
     rclpy.init(args=args)
-    node = AsimoStyleZMPWalker()
+    teleop_buffer = TeleopCommandBuffer()
+    node = AsimoStyleZMPWalker(teleop_buffer=teleop_buffer)
     try:
-        rclpy.spin(node)
+        if node.mode == "teleop_gui":
+            _run_teleop_gui(node, teleop_buffer)
+        else:
+            rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     except Exception as exc:
         if exc.__class__.__name__ != "RCLError":
             raise
     finally:
-        if rclpy.ok():
+        try:
             node.destroy_node()
+        except Exception:
+            pass
+        if rclpy.ok():
             rclpy.shutdown()
+
+
+def _run_teleop_gui(node: AsimoStyleZMPWalker, teleop_buffer: TeleopCommandBuffer) -> None:
+    spin_error = []
+
+    def spin_node() -> None:
+        try:
+            rclpy.spin(node)
+        except (ExternalShutdownException, KeyboardInterrupt):
+            pass
+        except Exception as exc:
+            if exc.__class__.__name__ != "RCLError":
+                spin_error.append(exc)
+
+    def shutdown() -> None:
+        if rclpy.ok():
+            rclpy.shutdown()
+
+    spin_thread = threading.Thread(target=spin_node, name="teleop_ros_spin", daemon=True)
+    spin_thread.start()
+    try:
+        from asimo_walker.teleop_gui import TeleopGuiApp
+
+        app = TeleopGuiApp(
+            teleop_buffer,
+            status_provider=node.teleop_status_snapshot,
+            shutdown_callback=shutdown,
+        )
+        app.run()
+    except Exception as exc:
+        print(f"teleop_gui failed to start: {exc}", file=sys.stderr)
+        shutdown()
+    finally:
+        shutdown()
+        spin_thread.join(timeout=2.0)
+        if spin_error:
+            raise spin_error[0]
 
 
 if __name__ == "__main__":

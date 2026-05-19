@@ -15,12 +15,37 @@
 ASIMO-style walker 的 ROS 2 可执行入口是：
 
 ```bash
-ros2 run robot_simulation_experiment asimo_style_zmp_walker
+ros2 run robot_simulation_experiment main.py
 ```
 
+默认 `mode=walk` 会按当前 baseline 自动前进。键盘 GUI 遥操作框架使用：
 
+```bash
+ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
+```
+
+第一版 GUI 只启用 `W` 前进，其余动作只保留 profile 结构和界面状态，不会驱动机器人执行未调动作。
 
 节点类为 `AsimoStyleZMPWalker`，节点名为 `asimo_style_zmp_walker`。它发布 `/legTargetJoints` 和 `/armTargetJoints`，并订阅 `/robot/ori`、`/robot/angVel`、`/robot/pos`、左右腿关节和左右臂关节反馈。
+
+## 键盘遥操作 GUI
+
+`mode=teleop_gui` 会启动 tkinter 图形界面。GUI 只负责写入键盘状态和选择 `MotionProfile`，不会直接发布 `/legTargetJoints`，底层仍然由 ASIMO-style ZMP walker 串联足步规划、ZMP/CoM、摆动脚、IK、稳定器、接触状态机、关节限幅和 ROS 2 发布。
+
+| 按键 | 功能 | 当前状态 |
+| --- | --- | --- |
+| `W` | 前进 | enabled，加载当前 baseline forward profile；再按一次请求安全停步并站稳 |
+| `S` | 后退 | reserved / disabled |
+| `A` | 左转朝向 | reserved / disabled |
+| `D` | 右转朝向 | reserved / disabled |
+| `Q` | 左拧腰 | reserved / disabled |
+| `E` | 右拧腰 | reserved / disabled |
+| `Shift` | 加速修饰 | reserved / disabled |
+| `Space` | 暂停/恢复 | enabled |
+| `R` | 清空按键状态，回到 idle | enabled |
+| `Esc` | 紧急停止/安全保持 | enabled |
+
+按下 disabled profile 时，GUI 会显示 reserved but disabled / 未配置，walker 保持 idle 或安全保持，不会修改步长、转向、腰部 yaw、手臂动作或 CoM 参数。`W` 锁定后会连续追加 baseline forward 脚步，不再受普通 `walk` 模式 6 步上限限制；再次按 `W` 会完成当前安全步后进入站稳恢复。后续动作会按实际仿真结果逐个调参后再启用。
 
 ## 关键参数
 
@@ -58,6 +83,9 @@ ros2 run robot_simulation_experiment asimo_style_zmp_walker
 | `leg_ik.py` | 腿部逆运动学。根据骨盆位姿和左右脚目标位姿求 6 自由度腿关节，并执行关节角限制。 |
 | `stabilizer.py` | 闭环稳定器。使用 `/robot/ori` 和 `/robot/angVel` 的 pitch/roll 反馈，为踝、髋和手臂添加小幅补偿，并给下一步落脚点提供保守修正。 |
 | `contact_state_machine.py` | 接触与步态状态机。执行 `CROUCH -> TRANSFER -> SWING -> TOUCHDOWN -> DOUBLE_SUPPORT -> STAND/DONE`，并在足底力缺失时使用相位回退逻辑。 |
+| `teleop_command.py` | GUI 与 ROS 控制循环之间的线程安全键盘状态缓冲。 |
+| `teleop_profiles.py` | 定义 `MotionProfile`，当前只启用 idle 和 forward baseline，其余 profile 均为 disabled 占位。 |
+| `teleop_gui.py` | tkinter 键盘遥操作界面，显示按键、profile、pause、emergency stop 和 walker 状态。 |
 | `main.py` | ROS 2 节点主入口。负责订阅反馈、串联完整控制链、发布关节目标和最终站立恢复。 |
 
 
@@ -70,7 +98,7 @@ ros2 run robot_simulation_experiment asimo_style_zmp_walker
 
 ### 2026.5.18
 
-- 建立模块化 `asimo_walker` 控制栈，并将入口安装为 `asimo_style_zmp_walker`。
+- 建立模块化 `asimo_walker` 控制栈，并将入口安装为 `main.py`。
 - 修正 CoppeliaSim 场景中的机器人前进方向，当前期望世界/地图方向为负 Y，内部使用 `sagittal_sign = -1.0`。
 - 完成保守 ZMP/CoM 步态、摆腿轨迹、IK、稳定器、接触状态机、关节限幅、关节速度限幅和最终站立恢复。
 - 在普通 `walk` 模式下完成 6 步行走，进入 `STAND` 后恢复到初始站姿，再进入 `DONE` 并保持直立。
@@ -109,3 +137,9 @@ ros2 run robot_simulation_experiment asimo_style_zmp_walker
 | `stable_pitch` | `5 deg` |
 | `stable_roll` | `6 deg` |
 | `abort_tilt` | `18 deg` |
+
+### 2026.5.19
+
+- 增加 `mode=teleop_gui` 键盘遥操作框架。
+- 新增 `MotionProfile` 架构和线程安全按键缓冲；第一版只启用 `W` 前进，复用现有 baseline 控制栈。
+- `S/A/D/Q/E/Shift` 只作为 reserved / disabled profile 显示，不产生真实运动。

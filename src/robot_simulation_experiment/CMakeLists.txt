@@ -26,12 +26,10 @@ endif()
 
 install(PROGRAMS
   scripts/asimo_walker/main.py
-  scripts/test.py
   DESTINATION lib/${PROJECT_NAME}
-  RENAME asimo_style_zmp_walker
 )
 
-install(CODE "execute_process(COMMAND /usr/bin/sed -i \"1s|.*|#!/usr/bin/python3|\" \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/asimo_style_zmp_walker\")")
+install(CODE "execute_process(COMMAND /usr/bin/sed -i \"1s|.*|#!/usr/bin/python3|\" \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/main.py\")")
 
 install(DIRECTORY
   scripts/

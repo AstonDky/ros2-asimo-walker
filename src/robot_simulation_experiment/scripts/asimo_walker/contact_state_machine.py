@@ -26,6 +26,8 @@ class ContactAndStateMachine:
         self.state_t = 0.0
         self.step_index = 0
         self._last_state = self.state
+        self.stop_requested = False
+        self.continuous_walk = False
 
     def reset(self, params: WalkerParams = None) -> None:
         if params is not None:
@@ -34,10 +36,21 @@ class ContactAndStateMachine:
         self.state_t = 0.0
         self.step_index = 0
         self._last_state = self.state
+        self.stop_requested = False
+        self.continuous_walk = False
 
     def start(self) -> None:
         if self.state == WalkState.WAIT:
             self._set(WalkState.CROUCH)
+
+    def request_stop_after_current_step(self) -> None:
+        self.stop_requested = True
+
+    def clear_stop_request(self) -> None:
+        self.stop_requested = False
+
+    def set_continuous_walk(self, enabled: bool) -> None:
+        self.continuous_walk = bool(enabled)
 
     def update(self, dt: float, feedback, pitch: float, roll: float) -> WalkState:
         p = self.params
@@ -60,7 +73,8 @@ class ContactAndStateMachine:
             self._set(WalkState.DOUBLE_SUPPORT_AFTER_LEFT)
         elif self.state == WalkState.DOUBLE_SUPPORT_AFTER_LEFT and self.state_t >= p.double_support_time and stable:
             self.step_index += 1
-            if self.step_index >= p.total_steps:
+            if self.stop_requested or (not self.continuous_walk and self.step_index >= p.total_steps):
+                self.stop_requested = False
                 self._set(WalkState.STAND)
             else:
                 self._set(WalkState.TRANSFER_TO_LEFT)
@@ -72,7 +86,8 @@ class ContactAndStateMachine:
             self._set(WalkState.DOUBLE_SUPPORT_AFTER_RIGHT)
         elif self.state == WalkState.DOUBLE_SUPPORT_AFTER_RIGHT and self.state_t >= p.double_support_time and stable:
             self.step_index += 1
-            if self.step_index >= p.total_steps:
+            if self.stop_requested or (not self.continuous_walk and self.step_index >= p.total_steps):
+                self.stop_requested = False
                 self._set(WalkState.STAND)
             else:
                 self._set(WalkState.TRANSFER_TO_RIGHT)
