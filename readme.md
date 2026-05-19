@@ -1,5 +1,7 @@
 # CoppeliaSim Asti ROS 2 双足行走控制实验
 
+[Screencast from 2026-05-18 18-39-14.webm](https://github.com/user-attachments/assets/54cd30d0-628e-40f6-b30a-78e2624fde47)
+
 ## 项目意图
 
 这个项目的目标是驱动 CoppeliaSim 内置的 Asti 双足机器人进行从零开始的运动控制与行走控制实验。Asti 的外形和控制目标接近本田 ASIMO 这类传统双足机器人，因此项目主线不是简单播放固定关节序列，而是逐步搭建一个包含足步规划、ZMP/CoM 规划、摆动脚轨迹、腿部 IK、姿态稳定和状态机保护的传统双足行走控制栈。
