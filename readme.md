@@ -27,7 +27,7 @@ ros2 run robot_simulation_experiment asimo_style_zmp_walker --ros-args -p mode:=
 
 ## 当前可调参数
 
-主要参数集中在 `src/robot_simulation_experiment/scripts/asimo_walker/common.py` 的 `WalkerParams` 数据类。调参时优先改这里的默认值；如果只是自动调参候选组合，改 `src/robot_simulation_experiment/scripts/asimo_walker/main.py` 里的 `_build_profiles()`。
+主要参数集中在 `src/robot_simulation_experiment/scripts/asimo_walker/common.py` 的 `WalkerParams` 数据类。
 
 | 参数 | 当前值 | 调节接口 | 对机器人影响 |
 | --- | ---: | --- | --- |
