@@ -30,7 +30,7 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=walk
 ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 ```
 
-当前 GUI 启用 `W` 前进、`S` 保守后退、`A/D` 原地左右转朝向，以及 `Q/E` 原地左右扭腰，其余动作只保留 profile 结构和界面状态，不会驱动机器人执行未调动作。
+当前 GUI 启用 `W` baseline 前进、`Shift` 较快前进、`S` 保守后退、`A/D` 较快原地左右转朝向，以及 `Q/E` 原地左右扭腰。
 
 节点类为 `AsimoStyleZMPWalker`，节点名为 `asimo_style_zmp_walker`。它发布 `/legTargetJoints` 和 `/armTargetJoints`，并订阅 `/robot/ori`、`/robot/angVel`、`/robot/pos`、左右腿关节和左右臂关节反馈。
 
@@ -41,17 +41,29 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | 按键 | 功能 | 当前状态 |
 | --- | --- | --- |
 | `W` | 前进 | enabled，加载当前 baseline forward profile；再按一次请求安全停步并站稳 |
+| `Shift` | 较快前进 | enabled，加载当前验证通过的较快前进 profile；再按一次请求安全停步并站稳 |
 | `S` | 后退 | enabled，加载 conservative backward profile；再按一次请求安全停步并站稳 |
-| `A` | 左转朝向 | enabled，加载 faster left-turn profile，约 20 步从面向前方转到面向左方 |
-| `D` | 右转朝向 | enabled，加载 faster right-turn profile，约 20 步从面向前方转到面向右方 |
+| `A` | 左转朝向 | enabled，加载当前验证通过的 left-turn profile，约 10 步完成一轮转向 |
+| `D` | 右转朝向 | enabled，加载与左转镜像的 right-turn profile，约 10 步完成一轮转向 |
 | `Q` | 左拧腰 | enabled，站立时向左扭腰约 10 deg；再按一次回到中位 |
 | `E` | 右拧腰 | enabled，站立时向右扭腰约 10 deg；再按一次回到中位 |
-| `Shift` | 加速修饰 | reserved / disabled |
 | `Space` | 暂停/恢复 | enabled |
 | `R` | 清空按键状态，回到 idle | enabled |
 | `Esc` | 紧急停止/安全保持 | enabled |
 
-按下 disabled profile 时，GUI 会显示 reserved but disabled / 未配置，walker 保持 idle 或安全保持，不会修改转向、腰部 yaw、手臂动作或 CoM 参数。`W` 或 `S` 锁定后会连续追加对应方向的脚步，不再受普通 `walk` 模式 6 步上限限制；再次按当前方向键会完成当前安全步后进入站稳恢复。`A/D` 是有限步数原地转向，完成约 90 度朝向变化后进入站稳恢复。`Q/E` 不走步，只在站立状态下通过 IK 给骨盆一个小幅 yaw 目标，脚保持原地支撑；再次按当前键或按 `R` 会回到中位。如果在前进、后退、转向和扭腰之间切换，walker 会先完成当前安全步或站稳恢复，再加载新方向的参数。
+按键切换时，walker 会先完成当前安全步或站稳恢复，再加载新方向的参数。`W`、`Shift`、`S` 锁定后会连续追加对应方向的脚步；再次按当前方向键会完成当前安全步后进入站稳恢复。`A/D` 是有限步数原地转向；`Q/E` 不走步，只在站立状态下通过 IK 给骨盆一个小幅 yaw 目标。
+
+## 当前按键绑定参数
+
+README 只保留当前已经调试成功并实际绑定到按键的参数。
+
+- `W` baseline forward: `step_length=0.045`, `step_width=0.09`, `step_time=1.75`, `double_support_time=0.55`, `transfer_time=0.85`, `touchdown_time=0.25`, `foot_clearance=0.045`, `swing_lift_fraction=0.28`, `swing_lower_fraction=0.30`, `zmp_kp=1.60`, `zmp_kd=1.00`, `max_joint_rate=1.45`, `max_arm_rate=1.20`, `max_com_speed=0.075`, `max_com_accel=0.20`, `total_steps=6`.
+- `Shift` validated faster forward: `step_length=0.048`, `step_width=0.09`, `step_time=1.62`, `double_support_time=0.50`, `transfer_time=0.78`, `touchdown_time=0.28`, `foot_clearance=0.048`, `swing_lift_fraction=0.25`, `swing_lower_fraction=0.28`, `zmp_kp=1.65`, `zmp_kd=1.08`, `max_joint_rate=1.52`, `max_arm_rate=1.22`, `max_com_speed=0.082`, `max_com_accel=0.22`, `total_steps=6`.
+- `S` backward: `step_length=0.032`, `step_width=0.095`, `step_time=1.95`, `double_support_time=0.68`, `transfer_time=0.96`, `touchdown_time=0.36`, `foot_clearance=0.050`, `swing_lift_fraction=0.32`, `swing_lower_fraction=0.38`, `zmp_kp=1.45`, `zmp_kd=1.25`, `max_joint_rate=1.20`, `max_arm_rate=1.00`, `max_com_speed=0.055`, `max_com_accel=0.13`, `total_steps=6`.
+- `A` validated faster left turn: `step_length=0.0`, `step_width=0.106`, `step_time=1.84`, `double_support_time=0.64`, `transfer_time=0.90`, `touchdown_time=0.36`, `foot_clearance=0.055`, `swing_lift_fraction=0.31`, `swing_lower_fraction=0.35`, `turn_yaw_per_step=5.2 deg`, `zmp_kp=1.35`, `zmp_kd=1.42`, `max_joint_rate=1.08`, `max_arm_rate=0.90`, `max_com_speed=0.050`, `max_com_accel=0.115`, `total_steps=10`.
+- `D` validated faster right turn: mirror of `A`, `turn_yaw_per_step=-5.2 deg`.
+- `Q` waist left: `waist_yaw_target=10 deg`, `waist_yaw_rate=20 deg/s`, `max_joint_rate=0.85`, `max_arm_rate=0.80`.
+- `E` waist right: mirror of `Q`, `waist_yaw_target=-10 deg`.
 
 ## 关键参数
 
@@ -90,7 +102,7 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | `stabilizer.py` | 闭环稳定器。使用 `/robot/ori` 和 `/robot/angVel` 的 pitch/roll 反馈，为踝、髋和手臂添加小幅补偿，并给下一步落脚点提供保守修正。 |
 | `contact_state_machine.py` | 接触与步态状态机。执行 `CROUCH -> TRANSFER -> SWING -> TOUCHDOWN -> DOUBLE_SUPPORT -> STAND/DONE`，并在足底力缺失时使用相位回退逻辑。 |
 | `teleop_command.py` | GUI 与 ROS 控制循环之间的线程安全键盘状态缓冲。 |
-| `teleop_profiles.py` | 定义 `MotionProfile`，当前启用 idle、forward baseline、conservative backward profile、较快一些的左右转 profile，以及站立扭腰 profile。 |
+| `teleop_profiles.py` | 定义 `MotionProfile`，当前启用 baseline forward、validated faster forward、conservative backward、validated faster left/right turn，以及站立扭腰 profile。 |
 | `teleop_gui.py` | tkinter 键盘遥操作界面，显示按键、profile、pause、emergency stop 和 walker 状态。 |
 | `main.py` | ROS 2 节点主入口。负责订阅反馈、串联完整控制链、发布关节目标和最终站立恢复。 |
 
@@ -158,3 +170,8 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 - 启用与左转镜像的 `D` 右转 profile，让机器人从面向前方逐步转到面向右方。
 - 启用 `Q/E` 站立扭腰 profile，通过固定双脚支撑下的小幅骨盆 yaw 命令实现左右扭腰。
 - `Shift` 继续作为 reserved / disabled profile 显示，不产生真实运动。
+
+### 2026.5.25
+
+- 将 `A/D` 更新为当前验证通过的较快转向参数：相比早期 `turn_yaw_per_step=4.5 deg`、`step_width=0.108`、`step_time=2.00`、`double_support_time=0.72`、`transfer_time=1.00`、`touchdown_time=0.42`、`zmp_kp=1.30`、`zmp_kd=1.45`、`max_joint_rate=1.00`、`max_com_speed=0.045`、`total_steps=20` 的较慢转向设置，当前绑定改为 `turn_yaw_per_step=5.2 deg`、`step_width=0.106`、`step_time=1.84`、`double_support_time=0.64`、`transfer_time=0.90`、`touchdown_time=0.36`、`zmp_kp=1.35`、`zmp_kd=1.42`、`max_joint_rate=1.08`、`max_com_speed=0.050`、`total_steps=10`，在保持稳定的前提下更快完成朝向切换。
+- 将 `Shift` 从占位键改为可执行的较快前进 profile：相比 `W` 的 baseline forward，当前 `Shift` 绑定把 `step_length` 从 `0.045` 提到 `0.048`，`step_time` 从 `1.75` 压缩到 `1.62`，`double_support_time` 从 `0.55` 压缩到 `0.50`，`transfer_time` 从 `0.85` 压缩到 `0.78`，`touchdown_time` 从 `0.25` 增到 `0.28`，`foot_clearance` 从 `0.045` 提到 `0.048`，`swing_lift_fraction` 从 `0.28` 调到 `0.25`，`swing_lower_fraction` 从 `0.30` 调到 `0.28`，并同步将 `zmp_kp` 从 `1.60` 提到 `1.65`、`zmp_kd` 从 `1.00` 提到 `1.08`、`max_joint_rate` 从 `1.45` 提到 `1.52`、`max_arm_rate` 从 `1.20` 提到 `1.22`、`max_com_speed` 从 `0.075` 提到 `0.082`、`max_com_accel` 从 `0.20` 提到 `0.22`，通过同时缩短步态时序、略增步长和提高 CoM / 关节响应上限，得到更快的前进响应。

@@ -348,7 +348,7 @@ class AsimoStyleZMPWalker(Node):
             self.state_machine.request_stop_after_current_step()
 
     def _is_enabled_walk_profile(self, profile) -> bool:
-        return profile.enabled and profile.name in ("forward_walk", "backward_walk", "turn_left", "turn_right")
+        return profile.enabled and profile.name in ("forward_walk", "backward_walk", "turn_left", "turn_right", "fast_modifier")
 
     def _is_enabled_waist_profile(self, profile) -> bool:
         return profile.enabled and profile.name in ("waist_left", "waist_right")

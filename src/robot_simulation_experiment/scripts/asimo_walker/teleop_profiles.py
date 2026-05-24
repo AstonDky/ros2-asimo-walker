@@ -95,26 +95,26 @@ def _turn_left_profile() -> MotionProfile:
     return MotionProfile(
         name="turn_left",
         enabled=True,
-        description="Moderately faster left turn",
+        description="Validated faster left turn",
         step_length=0.0,
-        step_width=0.108,
-        step_time=2.00,
-        double_support_time=0.72,
-        transfer_time=1.00,
-        touchdown_time=0.42,
-        foot_clearance=0.054,
-        swing_lift_fraction=0.35,
-        swing_lower_fraction=0.40,
+        step_width=0.106,
+        step_time=1.84,
+        double_support_time=0.64,
+        transfer_time=0.90,
+        touchdown_time=0.36,
+        foot_clearance=0.055,
+        swing_lift_fraction=0.31,
+        swing_lower_fraction=0.35,
         direction_sign=1.0,
-        turn_yaw_per_step=4.5 * D,
+        turn_yaw_per_step=5.2 * D,
         waist_yaw_target=0.0,
-        zmp_kp=1.30,
-        zmp_kd=1.45,
-        max_joint_rate=1.00,
-        max_arm_rate=0.85,
-        max_com_speed=0.045,
-        max_com_accel=0.10,
-        total_steps=20,
+        zmp_kp=1.35,
+        zmp_kd=1.42,
+        max_joint_rate=1.08,
+        max_arm_rate=0.90,
+        max_com_speed=0.050,
+        max_com_accel=0.115,
+        total_steps=10,
         allow_continuous_steps=False,
     )
 
@@ -124,7 +124,7 @@ def _turn_right_profile() -> MotionProfile:
     return MotionProfile(
         name="turn_right",
         enabled=True,
-        description="Moderately faster right turn",
+        description="Validated faster right turn",
         step_length=left.step_length,
         step_width=left.step_width,
         step_time=left.step_time,
@@ -173,6 +173,34 @@ def _waist_right_profile() -> MotionProfile:
     )
 
 
+def _forward_fast_profile() -> MotionProfile:
+    return MotionProfile(
+        name="fast_modifier",
+        enabled=True,
+        description="Validated faster forward walk",
+        step_length=0.048,
+        step_width=0.09,
+        step_time=1.62,
+        double_support_time=0.50,
+        transfer_time=0.78,
+        touchdown_time=0.28,
+        foot_clearance=0.048,
+        swing_lift_fraction=0.25,
+        swing_lower_fraction=0.28,
+        direction_sign=1.0,
+        turn_yaw_per_step=0.0,
+        waist_yaw_target=0.0,
+        zmp_kp=1.65,
+        zmp_kd=1.08,
+        max_joint_rate=1.52,
+        max_arm_rate=1.22,
+        max_com_speed=0.082,
+        max_com_accel=0.22,
+        total_steps=6,
+        allow_continuous_steps=True,
+    )
+
+
 idle_profile = MotionProfile(
     name="idle",
     enabled=True,
@@ -184,11 +212,7 @@ turn_left_profile = _turn_left_profile()
 turn_right_profile = _turn_right_profile()
 waist_left_profile = _waist_left_profile()
 waist_right_profile = _waist_right_profile()
-fast_modifier_profile = MotionProfile(
-    name="fast_modifier",
-    enabled=False,
-    description="Reserved for faster walking; not tuned yet",
-)
+fast_modifier_profile = _forward_fast_profile()
 
 _PROFILES = {
     profile.name: profile
@@ -256,11 +280,13 @@ def requested_profile_name(input_state) -> str:
         return "emergency_stop"
     if input_state.pause:
         return "pause"
+    if input_state.shift and not input_state.key_w:
+        return "fast_modifier"
     if input_state.key_w:
         extras = [name for attr, name in _ENABLED_KEY_PROFILES if getattr(input_state, attr)]
         extras.extend(name for attr, name in _DISABLED_KEY_PROFILES if getattr(input_state, attr))
         if input_state.shift:
-            extras.append("fast_modifier")
+            return "fast_modifier"
         if extras:
             return "forward_walk+" + "+".join(extras)
         return "forward_walk"
@@ -280,7 +306,15 @@ def resolve_profile_from_input(input_state) -> tuple[MotionProfile, str]:
     requested_enabled = [name for attr, name in _ENABLED_KEY_PROFILES if getattr(input_state, attr)]
     requested_disabled = [name for attr, name in _DISABLED_KEY_PROFILES if getattr(input_state, attr)]
     if input_state.shift:
-        requested_disabled.append("fast_modifier")
+        if requested_enabled:
+            enabled_text = ", ".join(f"'{name}'" for name in requested_enabled)
+            return (
+                fast_modifier_profile,
+                f"Requested profile(s) {enabled_text} conflict with fast forward; using validated faster forward walk.",
+            )
+        if input_state.key_w:
+            return fast_modifier_profile, "Validated faster forward walk active."
+        return fast_modifier_profile, "Validated faster forward walk active."
 
     if input_state.key_w:
         if requested_enabled:
@@ -288,12 +322,6 @@ def resolve_profile_from_input(input_state) -> tuple[MotionProfile, str]:
             return (
                 forward_walk_profile,
                 f"Requested profile(s) {enabled_text} conflict with forward; using forward baseline only.",
-            )
-        if requested_disabled:
-            disabled_text = ", ".join(f"'{name}'" for name in requested_disabled)
-            return (
-                forward_walk_profile,
-                f"Requested profile(s) {disabled_text} are reserved but disabled; using forward baseline only.",
             )
         return forward_walk_profile, "Forward baseline profile active."
 

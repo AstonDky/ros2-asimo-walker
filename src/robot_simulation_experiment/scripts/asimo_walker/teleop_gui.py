@@ -62,7 +62,7 @@ class TeleopGuiApp:
             ("D", "Turn right", "enabled"),
             ("Q", "Waist left", "enabled"),
             ("E", "Waist right", "enabled"),
-            ("Shift", "Fast modifier", "reserved"),
+            ("Shift", "Fast forward", "enabled"),
         )
         for index, (key, action, availability) in enumerate(rows, start=2):
             key_label = tk.Label(
