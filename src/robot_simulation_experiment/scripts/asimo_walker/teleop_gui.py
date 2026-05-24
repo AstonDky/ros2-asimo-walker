@@ -57,11 +57,11 @@ class TeleopGuiApp:
 
         rows = (
             ("W", "Forward", "enabled"),
-            ("S", "Backward", "reserved"),
-            ("A", "Turn left", "reserved"),
-            ("D", "Turn right", "reserved"),
-            ("Q", "Waist left", "reserved"),
-            ("E", "Waist right", "reserved"),
+            ("S", "Backward", "enabled"),
+            ("A", "Turn left", "enabled"),
+            ("D", "Turn right", "enabled"),
+            ("Q", "Waist left", "enabled"),
+            ("E", "Waist right", "enabled"),
             ("Shift", "Fast modifier", "reserved"),
         )
         for index, (key, action, availability) in enumerate(rows, start=2):
@@ -182,7 +182,7 @@ class TeleopGuiApp:
             key_label.configure(bg="#e8eaed", fg="#202124", relief="raised")
             state_label.configure(bg="#f8f9fa", fg="#3c4043")
             return
-        if key == "W":
+        if key in ("W", "S", "A", "D", "Q", "E"):
             key_label.configure(bg="#146c43", fg="white", relief="sunken")
             state_label.configure(bg="#0f5132", fg="white")
         else:

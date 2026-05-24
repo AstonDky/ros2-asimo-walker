@@ -26,12 +26,17 @@ class LegIK:
 
     def _solve_leg(self, pelvis: Pose2D, foot: Pose2D, side: str) -> list:
         side_sign = 1.0 if side == "left" else -1.0
-        hip_x = pelvis.x
-        hip_y = pelvis.y + side_sign * self.hip_width / 2.0
+        yaw_c = math.cos(pelvis.yaw)
+        yaw_s = math.sin(pelvis.yaw)
+        hip_lateral = side_sign * self.hip_width / 2.0
+        hip_x = pelvis.x - yaw_s * hip_lateral
+        hip_y = pelvis.y + yaw_c * hip_lateral
         hip_z = pelvis.z
 
-        dx = foot.x - hip_x
-        dy = foot.y - hip_y
+        dx_world = foot.x - hip_x
+        dy_world = foot.y - hip_y
+        dx = yaw_c * dx_world + yaw_s * dy_world
+        dy = -yaw_s * dx_world + yaw_c * dy_world
         dz = hip_z - foot.z
         sagittal = math.hypot(dx, dz)
         leg_len = clamp(math.hypot(sagittal, dy), 0.12, self.thigh_length + self.shin_length - 0.01)
@@ -63,4 +68,3 @@ class LegIK:
 
     def limit(self, q: list) -> list:
         return [clamp(q[i], self.limits[i][0], self.limits[i][1]) for i in range(LEG_DOF)]
-

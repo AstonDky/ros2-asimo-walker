@@ -20,7 +20,12 @@ from asimo_walker.leg_ik import LegIK
 from asimo_walker.stabilizer import Stabilizer
 from asimo_walker.swing_foot import SwingFootPlanner
 from asimo_walker.teleop_command import TeleopCommandBuffer, TeleopInputState
-from asimo_walker.teleop_profiles import get_profile, requested_profile_name, resolve_profile_from_input
+from asimo_walker.teleop_profiles import (
+    get_profile,
+    requested_profile_name,
+    resolve_profile_from_input,
+    walker_params_for_profile,
+)
 from asimo_walker.zmp_preview import ZMPPreviewPlanner
 from asimo_walker.zmp_reference import ZMPReferencePlanner
 
@@ -45,6 +50,7 @@ class AsimoStyleZMPWalker(Node):
         self.teleop_state_name = "WAIT"
         self.teleop_pitch_deg = None
         self.teleop_roll_deg = None
+        self.commanded_waist_yaw = 0.0
 
         self.leg_pub = self.create_publisher(Float64MultiArray, "/legTargetJoints", 10)
         self.arm_pub = self.create_publisher(Float64MultiArray, "/armTargetJoints", 10)
@@ -190,8 +196,9 @@ class AsimoStyleZMPWalker(Node):
             zmp_preview = zmp_now
         com_x, com_y, com_vx, com_vy, _, _ = self.com.update(self.dt, zmp_now, zmp_preview)
 
-        pelvis = Pose2D(com_x, com_y, self.params.pelvis_height, roll * 0.25, pitch * 0.25, 0.0)
         left_target_pose, right_target_pose = self._foot_targets(state, current_step)
+        pelvis_yaw = self._average_yaw(left_target_pose.yaw, right_target_pose.yaw)
+        pelvis = Pose2D(com_x, com_y, self.params.pelvis_height, roll * 0.25, pitch * 0.25, pelvis_yaw)
         left_q, right_q = self.ik.solve(pelvis, left_target_pose, right_target_pose)
 
         stab = self.stabilizer.compute(
@@ -254,7 +261,56 @@ class AsimoStyleZMPWalker(Node):
                 return True
             return False
 
-        if profile.name == "forward_walk" and profile.enabled:
+        if self._is_enabled_waist_profile(profile):
+            if state == WalkState.ABORT:
+                self.active_profile = get_profile("idle")
+                self.teleop_active_profile_name = self.active_profile.name
+                self.teleop_status_message = "Walker is ABORT; holding current command."
+                self._update_teleop_runtime_status(state, pitch, roll)
+                self._publish_hold_commands()
+                return True
+
+            self.active_profile = profile
+            self.teleop_active_profile_name = profile.name
+            if state in (WalkState.WAIT, WalkState.DONE):
+                self._update_teleop_runtime_status(state, pitch, roll)
+                self._publish_static_posture(pitch, roll, profile.waist_yaw_target or 0.0, profile.max_joint_rate)
+                return True
+            if state == WalkState.STAND:
+                self.teleop_status_message = f"{profile.description} requested; waiting for stand recovery."
+                return False
+            self.teleop_status_message = f"{profile.description} requested; finishing the current safe step first."
+            self._request_safe_stop_or_hold(state)
+            return False
+
+        if self._is_enabled_walk_profile(profile):
+            if state == WalkState.ABORT:
+                self.active_profile = get_profile("idle")
+                self.teleop_active_profile_name = self.active_profile.name
+                self.teleop_status_message = "Walker is ABORT; holding current command."
+                self._update_teleop_runtime_status(state, pitch, roll)
+                self._publish_hold_commands()
+                return True
+
+            if (
+                not profile.allow_continuous_steps
+                and self.active_profile.name == profile.name
+                and state in (WalkState.STAND, WalkState.DONE)
+            ):
+                self.teleop_status_message = f"{profile.description} complete; press the key again to clear."
+                if state == WalkState.DONE:
+                    self._update_teleop_runtime_status(state, pitch, roll)
+                    self._publish_hold_commands()
+                    return True
+                return False
+
+            if state not in (WalkState.WAIT, WalkState.STAND, WalkState.DONE) and self.active_profile.name != profile.name:
+                self.teleop_status_message = (
+                    f"{profile.description} requested; finishing the current safe step before switching profiles."
+                )
+                self._request_safe_stop_or_hold(state)
+                return False
+
             self.active_profile = profile
             self.teleop_active_profile_name = profile.name
             self.state_machine.clear_stop_request()
@@ -264,13 +320,6 @@ class AsimoStyleZMPWalker(Node):
             elif state == WalkState.STAND:
                 self._reset_teleop_walk_session()
                 self.state_machine.start()
-            elif state == WalkState.ABORT:
-                self.active_profile = get_profile("idle")
-                self.teleop_active_profile_name = self.active_profile.name
-                self.teleop_status_message = "Walker is ABORT; holding current command."
-                self._update_teleop_runtime_status(state, pitch, roll)
-                self._publish_hold_commands()
-                return True
             return False
 
         self.active_profile = get_profile("idle")
@@ -278,7 +327,10 @@ class AsimoStyleZMPWalker(Node):
         self._request_safe_stop_or_hold(state)
         if state in (WalkState.WAIT, WalkState.STAND, WalkState.DONE, WalkState.ABORT):
             self._update_teleop_runtime_status(state, pitch, roll)
-            self._publish_hold_commands()
+            if state != WalkState.ABORT and abs(self.commanded_waist_yaw) > 1e-3:
+                self._publish_static_posture(pitch, roll, 0.0)
+            else:
+                self._publish_hold_commands()
             return True
         return False
 
@@ -295,6 +347,12 @@ class AsimoStyleZMPWalker(Node):
         ):
             self.state_machine.request_stop_after_current_step()
 
+    def _is_enabled_walk_profile(self, profile) -> bool:
+        return profile.enabled and profile.name in ("forward_walk", "backward_walk", "turn_left", "turn_right")
+
+    def _is_enabled_waist_profile(self, profile) -> bool:
+        return profile.enabled and profile.name in ("waist_left", "waist_right")
+
     def _enter_stand_recovery(self) -> None:
         self.state_machine.clear_stop_request()
         self.state_machine._set(WalkState.STAND)
@@ -302,7 +360,7 @@ class AsimoStyleZMPWalker(Node):
         self.stand_start_right_cmd = list(self.prev_right_cmd or self.feedback.right_leg)
 
     def _reset_teleop_walk_session(self) -> None:
-        self.params = WalkerParams()
+        self.params = walker_params_for_profile(self.active_profile)
         self.dt = self.params.dt
         self.footsteps.reset(self.params)
         self.zmp_ref.reset(self.params)
@@ -323,6 +381,7 @@ class AsimoStyleZMPWalker(Node):
         self.stand_start_right_cmd = None
         self.pending_step_adjustment = None
         self.last_state = self.state_machine.state
+        self.commanded_waist_yaw = 0.0
 
     def _publish_hold_commands(self) -> None:
         left_q = list(self.prev_left_cmd or self.feedback.left_leg or [0.0] * LEG_DOF)
@@ -330,6 +389,29 @@ class AsimoStyleZMPWalker(Node):
         self.prev_left_cmd = left_q
         self.prev_right_cmd = right_q
         self._publish_legs(left_q, right_q)
+
+    def _publish_static_posture(self, pitch: float, roll: float, target_waist_yaw: float, max_joint_rate: float = None) -> None:
+        max_rate = max_joint_rate if max_joint_rate is not None else self.params.max_joint_rate
+        waist_rate = self.active_profile.waist_yaw_rate if self.active_profile.waist_yaw_rate is not None else 18.0 * D
+        yaw_limit = waist_rate * self.dt
+        self.commanded_waist_yaw += clamp(target_waist_yaw - self.commanded_waist_yaw, -yaw_limit, yaw_limit)
+
+        center_x, center_y = self._foot_center()
+        pelvis = Pose2D(
+            center_x,
+            center_y,
+            self.params.pelvis_height,
+            roll * 0.10,
+            pitch * 0.10,
+            self.commanded_waist_yaw,
+        )
+        left_q, right_q = self.ik.solve(pelvis, self.left_pose, self.right_pose)
+        left_q = self._rate_limit(left_q, self.prev_left_cmd, max_rate)
+        right_q = self._rate_limit(right_q, self.prev_right_cmd, max_rate)
+        self.prev_left_cmd = left_q
+        self.prev_right_cmd = right_q
+        self._publish_legs(left_q, right_q)
+        self._publish_arms([], [])
 
     def _update_teleop_runtime_status(self, state: WalkState, pitch: float, roll: float) -> None:
         self.teleop_state_name = state.name
@@ -399,6 +481,9 @@ class AsimoStyleZMPWalker(Node):
             0.5 * (self.left_pose.x + self.right_pose.x),
             0.5 * (self.left_pose.y + self.right_pose.y),
         )
+
+    def _average_yaw(self, left_yaw: float, right_yaw: float) -> float:
+        return math.atan2(math.sin(left_yaw) + math.sin(right_yaw), math.cos(left_yaw) + math.cos(right_yaw))
 
     def _apply_next_step_adjustment(self) -> None:
         if not self.pending_step_adjustment:

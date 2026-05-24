@@ -1,3 +1,5 @@
+import math
+
 from .common import Footstep, Pose2D, WalkerParams, clamp
 
 
@@ -33,25 +35,15 @@ class FootstepPlanner:
         if index % 2 == 0:
             support = "right"
             swing = "left"
-            left = Pose2D(
-                right.x + p.sagittal_sign * p.step_length,
-                p.step_width / 2.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-            )
+            yaw = right.yaw + p.turn_yaw_per_step
+            dx, dy = self._rotated_step_offset(p.sagittal_sign * p.step_length, p.step_width, right.yaw, yaw)
+            left = Pose2D(right.x + dx, right.y + dy, 0.0, 0.0, 0.0, yaw)
         else:
             support = "left"
             swing = "right"
-            right = Pose2D(
-                left.x + p.sagittal_sign * p.step_length,
-                -p.step_width / 2.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-            )
+            yaw = left.yaw + p.turn_yaw_per_step
+            dx, dy = self._rotated_step_offset(p.sagittal_sign * p.step_length, -p.step_width, left.yaw, yaw)
+            right = Pose2D(left.x + dx, left.y + dy, 0.0, 0.0, 0.0, yaw)
 
         self.steps.append(
             Footstep(
@@ -76,6 +68,13 @@ class FootstepPlanner:
 
     def initial_right(self) -> Pose2D:
         return Pose2D(0.0, -self.params.step_width / 2.0, 0.0, 0.0, 0.0, 0.0)
+
+    def _rotated_step_offset(self, forward: float, lateral: float, support_yaw: float, target_yaw: float) -> tuple:
+        yaw = 0.5 * (support_yaw + target_yaw)
+        return (
+            math.cos(yaw) * forward - math.sin(yaw) * lateral,
+            math.sin(yaw) * forward + math.cos(yaw) * lateral,
+        )
 
     def modify_next_step(self, index: int, dx: float, dy: float) -> None:
         if index >= len(self.steps):

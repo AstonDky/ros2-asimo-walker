@@ -18,13 +18,19 @@ ASIMO-style walker 的 ROS 2 可执行入口是：
 ros2 run robot_simulation_experiment main.py
 ```
 
-默认 `mode=walk` 会按当前 baseline 自动前进。键盘 GUI 遥操作框架使用：
+当前默认会启动键盘 GUI 遥操作。普通自动前进 `walk` 模式使用：
+
+```bash
+ros2 run robot_simulation_experiment main.py --ros-args -p mode:=walk
+```
+
+也可以显式启动 GUI：
 
 ```bash
 ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 ```
 
-第一版 GUI 只启用 `W` 前进，其余动作只保留 profile 结构和界面状态，不会驱动机器人执行未调动作。
+当前 GUI 启用 `W` 前进、`S` 保守后退、`A/D` 原地左右转朝向，以及 `Q/E` 原地左右扭腰，其余动作只保留 profile 结构和界面状态，不会驱动机器人执行未调动作。
 
 节点类为 `AsimoStyleZMPWalker`，节点名为 `asimo_style_zmp_walker`。它发布 `/legTargetJoints` 和 `/armTargetJoints`，并订阅 `/robot/ori`、`/robot/angVel`、`/robot/pos`、左右腿关节和左右臂关节反馈。
 
@@ -35,17 +41,17 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | 按键 | 功能 | 当前状态 |
 | --- | --- | --- |
 | `W` | 前进 | enabled，加载当前 baseline forward profile；再按一次请求安全停步并站稳 |
-| `S` | 后退 | reserved / disabled |
-| `A` | 左转朝向 | reserved / disabled |
-| `D` | 右转朝向 | reserved / disabled |
-| `Q` | 左拧腰 | reserved / disabled |
-| `E` | 右拧腰 | reserved / disabled |
+| `S` | 后退 | enabled，加载 conservative backward profile；再按一次请求安全停步并站稳 |
+| `A` | 左转朝向 | enabled，加载 faster left-turn profile，约 20 步从面向前方转到面向左方 |
+| `D` | 右转朝向 | enabled，加载 faster right-turn profile，约 20 步从面向前方转到面向右方 |
+| `Q` | 左拧腰 | enabled，站立时向左扭腰约 10 deg；再按一次回到中位 |
+| `E` | 右拧腰 | enabled，站立时向右扭腰约 10 deg；再按一次回到中位 |
 | `Shift` | 加速修饰 | reserved / disabled |
 | `Space` | 暂停/恢复 | enabled |
 | `R` | 清空按键状态，回到 idle | enabled |
 | `Esc` | 紧急停止/安全保持 | enabled |
 
-按下 disabled profile 时，GUI 会显示 reserved but disabled / 未配置，walker 保持 idle 或安全保持，不会修改步长、转向、腰部 yaw、手臂动作或 CoM 参数。`W` 锁定后会连续追加 baseline forward 脚步，不再受普通 `walk` 模式 6 步上限限制；再次按 `W` 会完成当前安全步后进入站稳恢复。后续动作会按实际仿真结果逐个调参后再启用。
+按下 disabled profile 时，GUI 会显示 reserved but disabled / 未配置，walker 保持 idle 或安全保持，不会修改转向、腰部 yaw、手臂动作或 CoM 参数。`W` 或 `S` 锁定后会连续追加对应方向的脚步，不再受普通 `walk` 模式 6 步上限限制；再次按当前方向键会完成当前安全步后进入站稳恢复。`A/D` 是有限步数原地转向，完成约 90 度朝向变化后进入站稳恢复。`Q/E` 不走步，只在站立状态下通过 IK 给骨盆一个小幅 yaw 目标，脚保持原地支撑；再次按当前键或按 `R` 会回到中位。如果在前进、后退、转向和扭腰之间切换，walker 会先完成当前安全步或站稳恢复，再加载新方向的参数。
 
 ## 关键参数
 
@@ -76,7 +82,7 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | --- | --- |
 | `__init__.py` | Python 包初始化文件。 |
 | `common.py` | 定义通用数据结构、物理常量、插值/限幅函数、`WalkerParams` 参数表和反馈数据结构。 |
-| `footstep_planner.py` | 足步规划器。根据 `step_length`、`step_width`、`total_steps`、`sagittal_sign` 生成左右脚交替的目标落脚点。 |
+| `footstep_planner.py` | 足步规划器。根据 `step_length`、`step_width`、`total_steps`、`sagittal_sign` 和 `turn_yaw_per_step` 生成左右脚交替的目标落脚点。 |
 | `zmp_reference.py` | ZMP 参考规划器。按状态机阶段生成双脚中心、支撑脚或触地过渡的 ZMP 目标，保证抬脚前先把重心转移到支撑脚。 |
 | `zmp_preview.py` | 简化 ZMP preview / LIPM CoM planner。用 `pelvis_height` 近似倒立摆高度，用 `zmp_kp`、`zmp_kd`、速度/加速度限幅生成平滑 CoM 轨迹。 |
 | `swing_foot.py` | 摆动脚轨迹规划器。用 smoothstep 插值生成前摆，同时按 `foot_clearance`、`swing_lift_fraction`、`swing_lower_fraction` 控制抬脚、空中保持和落脚。 |
@@ -84,7 +90,7 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | `stabilizer.py` | 闭环稳定器。使用 `/robot/ori` 和 `/robot/angVel` 的 pitch/roll 反馈，为踝、髋和手臂添加小幅补偿，并给下一步落脚点提供保守修正。 |
 | `contact_state_machine.py` | 接触与步态状态机。执行 `CROUCH -> TRANSFER -> SWING -> TOUCHDOWN -> DOUBLE_SUPPORT -> STAND/DONE`，并在足底力缺失时使用相位回退逻辑。 |
 | `teleop_command.py` | GUI 与 ROS 控制循环之间的线程安全键盘状态缓冲。 |
-| `teleop_profiles.py` | 定义 `MotionProfile`，当前只启用 idle 和 forward baseline，其余 profile 均为 disabled 占位。 |
+| `teleop_profiles.py` | 定义 `MotionProfile`，当前启用 idle、forward baseline、conservative backward profile、较快一些的左右转 profile，以及站立扭腰 profile。 |
 | `teleop_gui.py` | tkinter 键盘遥操作界面，显示按键、profile、pause、emergency stop 和 walker 状态。 |
 | `main.py` | ROS 2 节点主入口。负责订阅反馈、串联完整控制链、发布关节目标和最终站立恢复。 |
 
@@ -115,6 +121,7 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 | `pelvis_height` | `0.48` |
 | `total_steps` | `6` |
 | `sagittal_sign` | `-1.0` |
+| `turn_yaw_per_step` | `0.0` |
 | `support_zmp_margin` | `0.004` |
 | `zmp_preview_time` | `0.8` |
 | `zmp_kp` | `1.6` |
@@ -143,3 +150,11 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 - 增加 `mode=teleop_gui` 键盘遥操作框架。
 - 新增 `MotionProfile` 架构和线程安全按键缓冲；第一版只启用 `W` 前进，复用现有 baseline 控制栈。
 - `S/A/D/Q/E/Shift` 只作为 reserved / disabled profile 显示，不产生真实运动。
+
+### 2026.5.22
+
+- 启用 `S` 保守后退 profile，仍复用足步规划、ZMP/CoM、摆动脚、IK、稳定器、接触状态机和关节限幅控制链。
+- 启用 `A` 更快一点的左转 profile，通过小角度原地转向脚步让机器人从面向前方逐步转到面向左方。
+- 启用与左转镜像的 `D` 右转 profile，让机器人从面向前方逐步转到面向右方。
+- 启用 `Q/E` 站立扭腰 profile，通过固定双脚支撑下的小幅骨盆 yaw 命令实现左右扭腰。
+- `Shift` 继续作为 reserved / disabled profile 显示，不产生真实运动。

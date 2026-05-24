@@ -106,6 +106,7 @@ class WalkerParams:
     pelvis_height: float = 0.48
     total_steps: int = 6
     sagittal_sign: float = -1.0
+    turn_yaw_per_step: float = 0.0
     support_zmp_margin: float = 0.004
 
     zmp_preview_time: float = 0.8
