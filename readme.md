@@ -53,6 +53,18 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 
 按下 disabled profile 时，GUI 会显示 reserved but disabled / 未配置，walker 保持 idle 或安全保持，不会修改转向、腰部 yaw、手臂动作或 CoM 参数。`W` 或 `S` 锁定后会连续追加对应方向的脚步，不再受普通 `walk` 模式 6 步上限限制；再次按当前方向键会完成当前安全步后进入站稳恢复。`A/D` 是有限步数原地转向，完成约 90 度朝向变化后进入站稳恢复。`Q/E` 不走步，只在站立状态下通过 IK 给骨盆一个小幅 yaw 目标，脚保持原地支撑；再次按当前键或按 `R` 会回到中位。如果在前进、后退、转向和扭腰之间切换，walker 会先完成当前安全步或站稳恢复，再加载新方向的参数。
 
+## 按键 Profile 快照
+
+当前 active benchmark 如下，已经在一次失败的激进提速试验后恢复为这些值。
+
+- `W` benchmark: `step_length=0.045`, `step_width=0.09`, `step_time=1.75`, `double_support_time=0.55`, `transfer_time=0.85`, `touchdown_time=0.25`, `foot_clearance=0.045`, `swing_lift_fraction=0.28`, `swing_lower_fraction=0.30`, `zmp_kp=1.6`, `zmp_kd=1.0`, `max_joint_rate=1.45`, `max_arm_rate=1.2`, `max_com_speed=0.075`, `max_com_accel=0.20`.
+- `S` benchmark: `step_length=0.032`, `step_width=0.095`, `step_time=1.95`, `double_support_time=0.68`, `transfer_time=0.96`, `touchdown_time=0.36`, `foot_clearance=0.050`, `swing_lift_fraction=0.32`, `swing_lower_fraction=0.38`, `zmp_kp=1.45`, `zmp_kd=1.25`, `max_joint_rate=1.20`, `max_arm_rate=1.0`, `max_com_speed=0.055`, `max_com_accel=0.13`.
+- `A` benchmark: `step_length=0.0`, `step_width=0.108`, `step_time=2.00`, `double_support_time=0.72`, `transfer_time=1.00`, `touchdown_time=0.42`, `foot_clearance=0.054`, `swing_lift_fraction=0.35`, `swing_lower_fraction=0.40`, `turn_yaw_per_step=4.5 deg`, `zmp_kp=1.30`, `zmp_kd=1.45`, `max_joint_rate=1.00`, `max_arm_rate=0.85`, `max_com_speed=0.045`, `max_com_accel=0.10`, `total_steps=20`.
+- `D` benchmark: mirror of `A` benchmark, `turn_yaw_per_step=-4.5 deg`.
+- `Q` benchmark: `waist_yaw_target=10 deg`, `waist_yaw_rate=20 deg/s`, `max_joint_rate=0.85`, `max_arm_rate=0.8`.
+- `E` benchmark: mirror of `Q` benchmark, `waist_yaw_target=-10 deg`.
+- failed aggressive trial note: the faster forward retune from 2026-05-24 fell after about 3 corridor forward steps and was rolled back.
+
 ## 关键参数
 
 参数集中在 `src/robot_simulation_experiment/scripts/asimo_walker/common.py` 的 `WalkerParams` 数据类。baseline 参数表放在后面的“代码构建历史”部分，这里只说明各参数作用。
@@ -158,3 +170,12 @@ ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
 - 启用与左转镜像的 `D` 右转 profile，让机器人从面向前方逐步转到面向右方。
 - 启用 `Q/E` 站立扭腰 profile，通过固定双脚支撑下的小幅骨盆 yaw 命令实现左右扭腰。
 - `Shift` 继续作为 reserved / disabled profile 显示，不产生真实运动。
+
+### 2026.5.24
+
+- 把 `W/S/A/D/Q/E` 当时的全部已绑定 profile 参数作为 baseline 快照保存，便于后续继续做人工对比。
+- 将 `W` 的默认步态提速到更激进的前进 baseline，同时同步提高 `zmp_kp/zmp_kd`、关节速率和 CoM 速度上限。
+- 将 `S` 后退 profile 从保守设置推进到更短周期、更快重心转移和更高关节/CoM 响应。
+- 将 `A/D` 原地转向每步 yaw 从 `4.5 deg` 提到 `6.5 deg`，同时把总步数从 `20` 降到 `14`，明显提高朝向切换速度。
+- 将 `Q/E` 站立扭腰目标从 `10 deg` 提到 `14 deg`，扭腰速率从 `20 deg/s` 提到 `42 deg/s`，让站立姿态响应更直接。
+- 该组激进参数在前进走廊实测约 3 步后跌倒，因此全部 key-bound profile 与默认步态已恢复到 benchmark。
