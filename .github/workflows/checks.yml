@@ -38,6 +38,7 @@ jobs:
       - name: Check declared package dependencies
         run: |
           source /opt/ros/humble/setup.bash
+          rosdep update --rosdistro humble
           rosdep check --from-paths src --ignore-src --rosdistro humble
       - name: Build the ROS 2 package
         run: |
