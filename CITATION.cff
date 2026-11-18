@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, cite the repository and the specific commit used."
+type: software
+title: "ROS 2 ASIMO-style Walker"
+version: 0.1.0
+date-released: '2026-11-19'
+authors:
+  - family-names: Dong
+    given-names: Keyan
+    alias: AstonDky
+    website: "https://github.com/AstonDky"
+repository-code: "https://github.com/AstonDky/ros2-asimo-walker"
+url: "https://github.com/AstonDky/ros2-asimo-walker"
+abstract: "A ROS 2 and Python controller for CoppeliaSim Asti biped walking and keyboard teleoperation."

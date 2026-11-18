@@ -1,0 +1,10 @@
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.cff text eol=lf
+CMakeLists.txt text eol=lf
+LICENSE text eol=lf
+*.ttt binary

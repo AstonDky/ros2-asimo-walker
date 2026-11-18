@@ -1,62 +1,8 @@
-# CoppeliaSim Asti ROS 2 双足行走控制实验
+# 参数与开发记录
 
+[English README](../README.md) · [中文 README](../README.zh-CN.md)
 
-
-https://github.com/user-attachments/assets/eb173fc7-6ced-482a-a4a4-7628c81fdf40
-
-
-[Screencast from 2026-05-18 18-39-14.webm](https://github.com/user-attachments/assets/54cd30d0-628e-40f6-b30a-78e2624fde47)
-
-## 项目意图
-
-这个项目的目标是驱动 CoppeliaSim 内置的 Asti 双足机器人进行从零开始的运动控制与行走控制实验。Asti 的外形和控制目标接近本田 ASIMO 这类传统双足机器人，因此项目主线不是简单播放固定关节序列，而是逐步搭建一个包含足步规划、ZMP/CoM 规划、摆动脚轨迹、腿部 IK、姿态稳定和状态机保护的传统双足行走控制栈。
-
-长期目标是在 ROS 2 中实现键盘遥操作，通过 `W/A/S/D/Q/E` 等按键让仿真环境中的机器人平滑完成前进、后退、左转朝向、右转朝向、左扭动腰部、右扭动腰部等动作。目前重点已经推进到稳定双足行走：机器人能够按保守步态完成重心转移、抬脚、前摆、落脚、双脚支撑稳定和最终站立恢复。后续可以在传统控制栈基础上继续探索强化学习、MPC 或全身控制等方法。
-
-当前从 ROS 2 话题接口、状态机、ZMP/CoM 轨迹、摆动脚轨迹到 IK 和稳定补偿都按项目需求逐步搭建
-
-## 当前入口
-
-ASIMO-style walker 的 ROS 2 可执行入口是：
-
-```bash
-ros2 run robot_simulation_experiment main.py
-```
-
-当前默认会启动键盘 GUI 遥操作。普通自动前进 `walk` 模式使用：
-
-```bash
-ros2 run robot_simulation_experiment main.py --ros-args -p mode:=walk
-```
-
-也可以显式启动 GUI：
-
-```bash
-ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui
-```
-
-当前 GUI 启用 `W` baseline 前进、`Shift` 较快前进、`S` 保守后退、`A/D` 较快原地左右转朝向，以及 `Q/E` 原地左右扭腰。
-
-节点类为 `AsimoStyleZMPWalker`，节点名为 `asimo_style_zmp_walker`。它发布 `/legTargetJoints` 和 `/armTargetJoints`，并订阅 `/robot/ori`、`/robot/angVel`、`/robot/pos`、左右腿关节和左右臂关节反馈。
-
-## 键盘遥操作 GUI
-
-`mode=teleop_gui` 会启动 tkinter 图形界面。GUI 只负责写入键盘状态和选择 `MotionProfile`，不会直接发布 `/legTargetJoints`，底层仍然由 ASIMO-style ZMP walker 串联足步规划、ZMP/CoM、摆动脚、IK、稳定器、接触状态机、关节限幅和 ROS 2 发布。
-
-| 按键 | 功能 | 当前状态 |
-| --- | --- | --- |
-| `W` | 前进 | enabled，加载当前 baseline forward profile；再按一次请求安全停步并站稳 |
-| `Shift` | 较快前进 | enabled，加载当前验证通过的较快前进 profile；再按一次请求安全停步并站稳 |
-| `S` | 后退 | enabled，加载 conservative backward profile；再按一次请求安全停步并站稳 |
-| `A` | 左转朝向 | enabled，加载当前验证通过的 left-turn profile，约 10 步完成一轮转向 |
-| `D` | 右转朝向 | enabled，加载与左转镜像的 right-turn profile，约 10 步完成一轮转向 |
-| `Q` | 左拧腰 | enabled，站立时向左扭腰约 10 deg；再按一次回到中位 |
-| `E` | 右拧腰 | enabled，站立时向右扭腰约 10 deg；再按一次回到中位 |
-| `Space` | 暂停/恢复 | enabled |
-| `R` | 清空按键状态，回到 idle | enabled |
-| `Esc` | 紧急停止/安全保持 | enabled |
-
-按键切换时，walker 会先完成当前安全步或站稳恢复，再加载新方向的参数。`W`、`Shift`、`S` 锁定后会连续追加对应方向的脚步；再次按当前方向键会完成当前安全步后进入站稳恢复。`A/D` 是有限步数原地转向；`Q/E` 不走步，只在站立状态下通过 IK 给骨盆一个小幅 yaw 目标。
+以下保留项目 2026 年 5 月原有调参及开发记录。文中的“验证通过”等说法对应当时的手动仿真记录，不是自动测试结论；当前参数以源码为准。完整版本与物理引擎设置未在原记录中保存。
 
 ## 当前按键绑定参数
 
@@ -88,29 +34,6 @@ README 只保留当前已经调试成功并实际绑定到按键的参数。
 | `swing_lift_fraction` / `swing_lower_fraction` | `common.py: WalkerParams.swing_lift_fraction`, `common.py: WalkerParams.swing_lower_fraction` | 控制摆腿周期中抬脚和落脚阶段分配。 |
 | `max_joint_rate` / `max_com_speed` / `max_com_accel` | `common.py: WalkerParams.max_joint_rate`, `common.py: WalkerParams.max_com_speed`, `common.py: WalkerParams.max_com_accel` | 控制关节和 CoM 命令变化的激进程度。 |
 | `stable_pitch` / `stable_roll` / `abort_tilt` | `common.py: WalkerParams.stable_pitch`, `common.py: WalkerParams.stable_roll`, `common.py: WalkerParams.abort_tilt` | 控制状态切换稳定阈值和安全中止阈值。 |
-
-## 控制方法与代码结构
-
-当前控制方法是保守的 ASIMO-style 传统双足控制链：先规划落脚点，再生成 ZMP 参考和 CoM 轨迹，摆动脚按平滑轨迹抬起和落下，腿部 IK 解算关节角，IMU/角速度反馈通过踝和髋做稳定补偿，最后经过状态机、安全检查、关节限幅和关节速度限制后发布到 ROS 2。
-
-代码结构位于 `src/robot_simulation_experiment/scripts/asimo_walker/`：
-
-| 文件 | 原理/职责 |
-| --- | --- |
-| `__init__.py` | Python 包初始化文件。 |
-| `common.py` | 定义通用数据结构、物理常量、插值/限幅函数、`WalkerParams` 参数表和反馈数据结构。 |
-| `footstep_planner.py` | 足步规划器。根据 `step_length`、`step_width`、`total_steps`、`sagittal_sign` 和 `turn_yaw_per_step` 生成左右脚交替的目标落脚点。 |
-| `zmp_reference.py` | ZMP 参考规划器。按状态机阶段生成双脚中心、支撑脚或触地过渡的 ZMP 目标，保证抬脚前先把重心转移到支撑脚。 |
-| `zmp_preview.py` | 简化 ZMP preview / LIPM CoM planner。用 `pelvis_height` 近似倒立摆高度，用 `zmp_kp`、`zmp_kd`、速度/加速度限幅生成平滑 CoM 轨迹。 |
-| `swing_foot.py` | 摆动脚轨迹规划器。用 smoothstep 插值生成前摆，同时按 `foot_clearance`、`swing_lift_fraction`、`swing_lower_fraction` 控制抬脚、空中保持和落脚。 |
-| `leg_ik.py` | 腿部逆运动学。根据骨盆位姿和左右脚目标位姿求 6 自由度腿关节，并执行关节角限制。 |
-| `stabilizer.py` | 闭环稳定器。使用 `/robot/ori` 和 `/robot/angVel` 的 pitch/roll 反馈，为踝、髋和手臂添加小幅补偿，并给下一步落脚点提供保守修正。 |
-| `contact_state_machine.py` | 接触与步态状态机。执行 `CROUCH -> TRANSFER -> SWING -> TOUCHDOWN -> DOUBLE_SUPPORT -> STAND/DONE`，并在足底力缺失时使用相位回退逻辑。 |
-| `teleop_command.py` | GUI 与 ROS 控制循环之间的线程安全键盘状态缓冲。 |
-| `teleop_profiles.py` | 定义 `MotionProfile`，当前启用 baseline forward、validated faster forward、conservative backward、validated faster left/right turn，以及站立扭腰 profile。 |
-| `teleop_gui.py` | tkinter 键盘遥操作界面，显示按键、profile、pause、emergency stop 和 walker 状态。 |
-| `main.py` | ROS 2 节点主入口。负责订阅反馈、串联完整控制链、发布关节目标和最终站立恢复。 |
-
 
 ## 代码构建历史
 

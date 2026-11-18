@@ -12,7 +12,6 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from std_msgs.msg import Float64MultiArray
 
-from asimo_walker.autotune import AutoTuneManager
 from asimo_walker.common import D, LEG_DOF, Pose2D, RobotFeedback, WalkerParams, clamp, lerp, smoothstep
 from asimo_walker.contact_state_machine import ContactAndStateMachine, WalkState
 from asimo_walker.footstep_planner import FootstepPlanner
@@ -95,7 +94,19 @@ class AsimoStyleZMPWalker(Node):
         self.last_debug_t = self.get_clock().now()
         self.pending_step_adjustment = None
 
-        self.autotune = AutoTuneManager(self) if self.mode == "auto_tune" else None
+        self.autotune = None
+        if self.mode == "auto_tune":
+            try:
+                from asimo_walker.autotune import AutoTuneManager
+            except ModuleNotFoundError as exc:
+                if exc.name != "asimo_walker.autotune":
+                    raise
+                raise RuntimeError(
+                    "mode=auto_tune requires the private autotune.py extension, "
+                    "which is not included in this repository. Use mode=walk "
+                    "or mode=teleop_gui."
+                ) from exc
+            self.autotune = AutoTuneManager(self)
 
         self.timer = self.create_timer(self.dt, self.loop)
         self.get_logger().info(f"mode={self.mode}; publishing /legTargetJoints and /armTargetJoints")
@@ -579,7 +590,7 @@ def main(args=None):
         print("Usage:")
         print("  ros2 run robot_simulation_experiment main.py")
         print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=walk")
-        print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=auto_tune")
+        print("  mode=auto_tune requires a private extension not included in this repository.")
         print("  ros2 run robot_simulation_experiment main.py --ros-args -p mode:=teleop_gui")
         return
     rclpy.init(args=args)

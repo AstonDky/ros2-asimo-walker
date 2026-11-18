@@ -29,8 +29,6 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(CODE "execute_process(COMMAND /usr/bin/sed -i \"1s|.*|#!/usr/bin/python3|\" \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/main.py\")")
-
 install(DIRECTORY
   scripts/
   DESTINATION lib/${PROJECT_NAME}
