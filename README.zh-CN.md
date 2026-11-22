@@ -183,4 +183,4 @@ python3 -B -m unittest discover -s tests -v
 
 贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)，变更记录见 [CHANGELOG.md](CHANGELOG.md)，软件引用信息见 [CITATION.cff](CITATION.cff)。引用时记录具体 commit，不把软件引用写成论文发表。
 
-项目自有控制器源码和自编文档采用 [MIT License](LICENSE)。CoppeliaSim、插件、Asti 模型和场景素材保留各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。实现过程中大量使用了 AI 辅助；作者参与架构、部分核心设计和仿真迭代，不将全部代码表述为独立手写。
+项目自有控制器源码和自编文档采用 [MIT License](LICENSE)。CoppeliaSim、插件、Asti 模型和场景素材保留各自许可，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

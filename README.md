@@ -183,4 +183,4 @@ The [development record](docs/tuning-history.zh-CN.md) documents a six-step walk
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) and [CITATION.cff](CITATION.cff). Cite the commit used; software citation metadata does not imply a paper publication.
 
-Original controller code and project-authored documentation use the [MIT License](LICENSE). CoppeliaSim, its plugins, the Asti model and scene assets retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The implementation was developed with substantial AI assistance; the author participated in architecture, core design choices and iterative simulation work.
+Original controller code and project-authored documentation use the [MIT License](LICENSE). CoppeliaSim, its plugins, the Asti model and scene assets retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
